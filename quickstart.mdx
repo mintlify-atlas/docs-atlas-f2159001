@@ -1,0 +1,355 @@
+---
+title: Quick Start
+description: Get up and running with OpenFang in 5 minutes — install, configure, and spawn your first autonomous agent
+icon: rocket
+---
+
+This guide will get you from zero to a working OpenFang agent in under 5 minutes.
+
+## Prerequisites
+
+- An LLM API key (Anthropic, OpenAI, Groq, or Gemini)
+- Terminal access (macOS, Linux, or Windows PowerShell)
+
+<Note>
+If you don't have an API key yet, we recommend [Groq](https://console.groq.com/) for fast free inference, or [Ollama](https://ollama.ai/) for running models locally.
+</Note>
+
+## Installation
+
+<Steps>
+
+<Step title="Install OpenFang">
+
+<CodeGroup>
+
+```bash macOS/Linux
+curl -fsSL https://openfang.sh/install | sh
+```
+
+```powershell Windows
+irm https://openfang.sh/install.ps1 | iex
+```
+
+```bash Docker
+docker pull ghcr.io/rightnow-ai/openfang:latest
+```
+
+</CodeGroup>
+
+Verify the installation:
+
+```bash
+openfang --version
+```
+
+</Step>
+
+<Step title="Initialize configuration">
+
+Run the interactive setup wizard:
+
+```bash
+openfang init
+```
+
+The wizard will:
+- Create `~/.openfang/` directory
+- Generate a default `config.toml`
+- Prompt you to configure an LLM provider
+
+<Tip>
+Use `openfang init --quick` to skip the wizard and create a minimal config.
+</Tip>
+
+</Step>
+
+<Step title="Configure your LLM provider">
+
+When prompted, choose your provider and paste your API key. The wizard supports:
+
+- **Anthropic** (Claude) - Recommended for production
+- **OpenAI** (GPT-4) - Widest compatibility
+- **Groq** - Fastest inference, generous free tier
+- **Gemini** - Google's models
+- **Ollama** - Run models locally
+
+Example for Anthropic:
+
+```bash
+Which provider would you like to use? anthropic
+Enter your Anthropic API key: sk-ant-api03-...
+```
+
+The wizard will test your API key and save it to `~/.openfang/config.toml`.
+
+<Accordion title="Manual configuration">
+If you prefer to configure manually, edit `~/.openfang/config.toml`:
+
+```toml config.toml
+[default_model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[memory]
+decay_rate = 0.05
+```
+
+Then set your API key as an environment variable:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-api03-..."
+```
+</Accordion>
+
+</Step>
+
+<Step title="Start the daemon">
+
+Start the OpenFang daemon:
+
+```bash
+openfang start
+```
+
+The daemon will:
+- Boot the kernel and load all subsystems
+- Start the HTTP API server on `http://127.0.0.1:4200`
+- Initialize the memory substrate (SQLite)
+- Connect to configured channel adapters
+
+Verify the daemon is running:
+
+```bash
+openfang status
+```
+
+Expected output:
+
+```
+✓ Daemon is running (PID 12345)
+✓ API server listening on http://127.0.0.1:4200
+✓ Memory substrate initialized
+✓ 0 agents active
+```
+
+</Step>
+
+<Step title="Spawn your first agent">
+
+Create an agent using the `researcher` template:
+
+```bash
+openfang agent new researcher
+```
+
+The CLI will:
+1. Show you the template's manifest
+2. Prompt for a name (default: "researcher")
+3. Create and spawn the agent
+
+Example session:
+
+```bash
+$ openfang agent new researcher
+
+Template: researcher
+Description: Deep research agent with web search, fact-checking, and citation
+Tools: web_search, web_fetch, memory_store, memory_recall
+
+Enter agent name (default: researcher): my-researcher
+✓ Agent spawned: my-researcher (ID: 550e8400-e29b-41d4-a716-446655440000)
+```
+
+</Step>
+
+<Step title="Chat with your agent">
+
+Start an interactive chat session:
+
+```bash
+openfang agent chat my-researcher
+```
+
+Try asking a research question:
+
+```
+You: What are the key architectural differences between OpenFang and LangChain?
+
+my-researcher: Let me research that for you...
+
+[Tool: web_search("OpenFang vs LangChain architecture")]
+[Tool: web_fetch("https://openfang.sh/docs/architecture")]
+[Tool: web_fetch("https://langchain.com/docs/architecture")]
+
+Based on my research, here are the key architectural differences:
+
+1. **Language**: OpenFang is built in Rust (14 crates, 137K LOC), while LangChain is Python-based...
+
+2. **Core Model**: OpenFang is an Agent Operating System with a kernel architecture, whereas LangChain is a library framework...
+
+3. **Execution**: OpenFang agents run autonomously on schedules via "Hands", while LangChain agents are typically invoked programmatically...
+
+[Citations: 5 sources]
+```
+
+<Tip>
+Type `/help` to see available chat commands, or `/stop` to end the conversation.
+</Tip>
+
+</Step>
+
+</Steps>
+
+## What You've Built
+
+You now have:
+
+- ✅ OpenFang daemon running
+- ✅ HTTP API accessible at `http://127.0.0.1:4200`
+- ✅ A researcher agent with web search capabilities
+- ✅ SQLite memory for conversation persistence
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Web Dashboard" icon="browser" href="http://127.0.0.1:4200">
+  Open the built-in dashboard to manage agents visually
+</Card>
+
+<Card title="Create Custom Agents" icon="user-plus" href="/guides/creating-agents">
+  Build agents with custom tools and prompts
+</Card>
+
+<Card title="Autonomous Hands" icon="hand" href="/hands/overview">
+  Activate pre-built Hands that work for you 24/7
+</Card>
+
+<Card title="Connect to Telegram" icon="paper-plane" href="/integrations/channels">
+  Deploy your agent to messaging platforms
+</Card>
+
+</CardGroup>
+
+## Try the Dashboard
+
+Open your browser to `http://127.0.0.1:4200` to access the WebChat UI:
+
+1. **Chat Interface** - Message agents with real-time streaming
+2. **Agent List** - View all spawned agents and their status
+3. **Memory Browser** - Explore conversation history
+4. **System Status** - Monitor token usage and costs
+
+## Quick Commands Reference
+
+```bash
+# Daemon management
+openfang start                    # Start daemon
+openfang stop                     # Stop daemon
+openfang status                   # Check status
+
+# Agent operations
+openfang agent list               # List all agents
+openfang agent chat <name>        # Interactive chat
+openfang message <name> "text"    # Send one message
+openfang agent kill <name>        # Delete agent
+
+# System info
+openfang health                   # Health check
+openfang doctor                   # Run diagnostics
+openfang logs --follow            # Stream logs
+```
+
+## Activate an Autonomous Hand
+
+Hands are pre-built autonomous agents that run on schedules. Try the **Researcher Hand**:
+
+```bash
+openfang hand activate researcher
+```
+
+The Researcher Hand will:
+- Run daily at a configured time
+- Research topics you assign
+- Build a knowledge graph of findings
+- Deliver reports to your configured channel (Telegram, Discord, etc.)
+
+View active Hands:
+
+```bash
+openfang hand active
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Command not found">
+  The installer adds `~/.openfang/bin/` to your PATH, but your shell may need to be restarted:
+
+  ```bash
+  source ~/.bashrc  # or ~/.zshrc
+  ```
+
+  Or use the full path: `~/.openfang/bin/openfang`
+</Accordion>
+
+<Accordion title="API key invalid">
+  Test your API key configuration:
+
+  ```bash
+  openfang config test-key anthropic
+  ```
+
+  If it fails, reconfigure:
+
+  ```bash
+  openfang config set-key anthropic
+  ```
+</Accordion>
+
+<Accordion title="Port 4200 already in use">
+  Change the listen address in `~/.openfang/config.toml`:
+
+  ```toml
+  api_listen = "127.0.0.1:4201"
+  ```
+
+  Then restart: `openfang stop && openfang start`
+</Accordion>
+
+<Accordion title="Daemon won't start">
+  Run diagnostics:
+
+  ```bash
+  openfang doctor
+  ```
+
+  Check logs:
+
+  ```bash
+  openfang logs --lines 50
+  ```
+</Accordion>
+
+</AccordionGroup>
+
+## What's Next?
+
+<Card title="Full Installation Guide" icon="download" href="/installation">
+  Advanced installation options, Docker Compose, systemd services
+</Card>
+
+<Card title="Configuration" icon="gear" href="/configuration/overview">
+  Configure models, channels, security, and memory
+</Card>
+
+<Card title="Core Concepts" icon="book" href="/concepts/architecture">
+  Understand the 14-crate architecture
+</Card>
+
+<Card title="API Reference" icon="code" href="/api/overview">
+  Integrate OpenFang programmatically
+</Card>
