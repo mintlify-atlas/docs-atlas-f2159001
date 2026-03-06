@@ -1,0 +1,558 @@
+---
+title: 'Browser Hand'
+description: 'Autonomous web browser that navigates sites, fills forms, and completes multi-step tasks'
+icon: 'browser'
+---
+
+## Overview
+
+Browser Hand is an AI-powered web automation agent that interacts with real websites on your behalf — navigating pages, clicking buttons, filling forms, and completing complex multi-step workflows with safety guardrails.
+
+**Category:** Productivity  
+**Icon:** 🌐
+
+## What It Does
+
+<Steps>
+  <Step title="Navigate Websites">
+    Load any URL and read page content
+  </Step>
+  
+  <Step title="Interact with Elements">
+    Click buttons/links, fill form fields, select dropdowns
+  </Step>
+  
+  <Step title="Extract Information">
+    Read page content, take screenshots, capture data
+  </Step>
+  
+  <Step title="Complete Multi-Step Tasks">
+    Search products, compare prices, book appointments, submit forms
+  </Step>
+  
+  <Step title="Safety Guardrails">
+    ALWAYS ask for approval before purchases or payments
+  </Step>
+</Steps>
+
+## Requirements
+
+<Warning>
+Browser Hand requires Python 3 and Playwright browser automation library.
+</Warning>
+
+### Python 3
+
+```bash
+# macOS
+brew install python3
+
+# Windows
+winget install Python.Python.3.12
+
+# Linux (Ubuntu/Debian)
+sudo apt install python3
+
+# Linux (Fedora)
+sudo dnf install python3
+
+# Linux (Arch)
+sudo pacman -S python
+```
+
+### Playwright
+
+```bash
+# Install Playwright
+pip install playwright
+
+# Install browser binaries (required)
+playwright install chromium
+```
+
+**Estimated setup time:** 3-5 minutes
+
+## Configuration
+
+### Browser Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Headless Mode** | `true` | Run browser without visible window (recommended for servers) |
+| **Purchase Approval** | `true` | Require explicit confirmation before any purchase or payment |
+| **Max Pages Per Task** | `20` | Safety limit on page navigations to prevent runaway browsing |
+| **Default Wait** | `auto` | How long to wait after actions (`auto`, `1`, `3` seconds) |
+| **Screenshot on Action** | `false` | Automatically capture screenshot after every click/navigate |
+
+<Note>
+**Purchase Approval is ON by default and cannot be disabled for payments.** Browser Hand will NEVER auto-complete purchases without your explicit confirmation.
+</Note>
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate browser
+```
+
+Configure settings:
+
+```bash
+openfang hand config browser \
+  --set headless="false" \
+  --set max_pages_per_task="20" \
+  --set screenshot_on_action="true"
+```
+
+### Example Workflows
+
+#### Product Search
+
+```
+> Search Amazon for "mechanical keyboards under $100" and show me the top 3 results with prices
+```
+
+Browser Hand will:
+1. Navigate to amazon.com
+2. Find search box (`input[type="search"]`)
+3. Type "mechanical keyboards under $100"
+4. Click search or submit
+5. Read results page
+6. Extract top 3 products with names, prices, ratings
+7. Present results as a table
+
+#### Form Filling
+
+```
+> Fill out the contact form at https://example.com/contact with:
+Name: John Doe
+Email: john@example.com
+Message: Interested in learning more about your product
+
+Take a screenshot before submitting for my review.
+```
+
+#### Multi-Step Research
+
+```
+> Go to TechCrunch, find the latest article about AI agents, and summarize it
+```
+
+## How It Works
+
+### 1. Browser Session
+
+Browser Hand maintains a persistent browser session across tool calls:
+
+```python
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    
+    # Session persists - cookies, login state maintained
+    page.goto("https://example.com")
+    # ... interact ...
+    
+    browser.close()
+```
+
+**Session features:**
+- Cookies persist across page navigations
+- Login state maintained
+- Session ends when conversation ends or when you close it explicitly
+
+### 2. Core Browser Tools
+
+#### `browser_navigate`
+
+Navigate to a URL:
+
+```javascript
+browser_navigate({url: "https://amazon.com"})
+```
+
+Waits for page to load (DOM ready).
+
+#### `browser_read_page`
+
+Read current page content:
+
+```javascript
+browser_read_page()
+// Returns: page title, URL, visible text, form structure
+```
+
+**Output example:**
+```
+URL: https://amazon.com/s?k=mechanical+keyboards
+Title: Amazon.com: mechanical keyboards
+
+Visible text:
+Mechanical Keyboards
+Results 1-48 of 2,000+
+
+Logitech MX Mechanical
+$149.99
+★★★★☆ 4.3 (1,234)
+
+Keychron K2
+$89.99
+★★★★★ 4.7 (5,678)
+...
+```
+
+#### `browser_click`
+
+Click an element by CSS selector or visible text:
+
+```javascript
+// By CSS selector
+browser_click({selector: "button[type='submit']"})
+
+// By visible text
+browser_click({text: "Add to Cart"})
+```
+
+#### `browser_type`
+
+Type text into an input field:
+
+```javascript
+browser_type({selector: "input[name='q']", text: "mechanical keyboards"})
+```
+
+#### `browser_screenshot`
+
+Capture a screenshot:
+
+```javascript
+browser_screenshot({filename: "search_results.png"})
+```
+
+Saves to current directory.
+
+#### `browser_close`
+
+Close the browser session:
+
+```javascript
+browser_close()
+```
+
+Frees resources. Session auto-closes at conversation end.
+
+### 3. Element Selection
+
+**CSS Selectors (preferred):**
+
+| Pattern | Example | Use |
+|---------|---------|-----|
+| `#id` | `#search-box` | Element by ID |
+| `.class` | `.btn-primary` | Element by class |
+| `input[name="..."]` | `input[name="email"]` | Input by name |
+| `input[type="..."]` | `input[type="search"]` | Input by type |
+| `button[type="submit"]` | - | Submit buttons |
+| `a[href*="..."]` | `a[href*="cart"]` | Links containing text |
+| `[data-testid="..."]` | `[data-testid="checkout"]` | Test IDs |
+
+**Fallback to visible text:**
+
+If CSS selector fails:
+```javascript
+browser_click({text: "Add to Cart"}) // Clicks element with visible text
+```
+
+### 4. Common Patterns
+
+#### Search Pattern
+
+<Steps>
+  <Step title="Navigate to site">
+    `browser_navigate({url: "https://example.com"})`
+  </Step>
+  
+  <Step title="Find search box">
+    `input[type="search"]`, `input[name="q"]`, `#search`
+  </Step>
+  
+  <Step title="Type query">
+    `browser_type({selector: "input[name='q']", text: "query"})`
+  </Step>
+  
+  <Step title="Submit">
+    `browser_click({selector: "button[type='submit']"})` or Enter auto-submits
+  </Step>
+  
+  <Step title="Read results">
+    `browser_read_page()`
+  </Step>
+</Steps>
+
+#### Login Pattern
+
+<Steps>
+  <Step title="Navigate to login page">
+    `browser_navigate({url: "https://example.com/login"})`
+  </Step>
+  
+  <Step title="Fill email">
+    `browser_type({selector: "input[name='email']", text: "user@example.com"})`
+  </Step>
+  
+  <Step title="Fill password">
+    `browser_type({selector: "input[name='password']", text: "password123"})`
+  </Step>
+  
+  <Step title="Click login">
+    `browser_click({selector: "button[type='submit']"})`
+  </Step>
+  
+  <Step title="Verify success">
+    `browser_read_page()` to check for dashboard/welcome message
+  </Step>
+</Steps>
+
+<Warning>
+**NEVER store passwords in memory.** Browser Hand asks for credentials when needed but does not save them.
+</Warning>
+
+#### E-commerce Pattern
+
+<Steps>
+  <Step title="Search product">
+    Navigate and search
+  </Step>
+  
+  <Step title="Click product">
+    Click from results
+  </Step>
+  
+  <Step title="Select options">
+    Size, color, quantity
+  </Step>
+  
+  <Step title="Add to cart">
+    `browser_click({text: "Add to Cart"})`
+  </Step>
+  
+  <Step title="Navigate to cart">
+    `browser_click({text: "Cart"})`
+  </Step>
+  
+  <Step title="Review items">
+    `browser_read_page()` to see cart contents and total
+  </Step>
+  
+  <Step title="STOP - Ask for approval">
+    **CRITICAL:** Summarize cart and total, ask user for confirmation
+  </Step>
+  
+  <Step title="Checkout (only if approved)">
+    Proceed to checkout ONLY after user confirms
+  </Step>
+</Steps>
+
+### 5. Purchase Approval (MANDATORY)
+
+<Warning>
+**Before ANY purchase, payment, or order submission:**
+
+1. Summarize what you are about to buy
+2. Show the total cost
+3. List all items in the cart
+4. STOP and ask the user for explicit confirmation
+5. Only proceed after receiving clear "yes" approval
+
+Browser Hand NEVER auto-completes purchases. NEVER clicks "Place Order", "Pay Now", "Confirm Purchase", or any payment button without user approval.
+</Warning>
+
+**Example approval flow:**
+
+```
+Browser Hand:
+"I'm ready to complete your purchase. Here's what's in the cart:
+
+1. Keychron K2 Mechanical Keyboard - $89.99
+2. USB-C Cable - $12.99
+
+Subtotal: $102.98
+Shipping: $5.99
+Tax: $8.24
+Total: $117.21
+
+Shipping to: 123 Main St, San Francisco, CA 94102
+Payment: Visa ending in 1234
+
+Do you want me to complete this purchase? (yes/no)"
+
+User: "yes"
+
+Browser Hand:
+[Proceeds to click "Place Order"]
+"Order placed! Confirmation number: #ABC123456"
+```
+
+### 6. Error Recovery
+
+**Element not found:**
+```
+Error: Selector "#search-box" not found
+
+Recovery:
+1. Try alternative selector: input[type="search"]
+2. Try visible text: browser_click({text: "Search"})
+3. Take screenshot to debug
+4. Inform user
+```
+
+**Page doesn't load:**
+```
+Error: Navigation timeout
+
+Recovery:
+1. Wait and retry: browser_navigate({url})
+2. Check if URL is correct
+3. Inform user of issue
+```
+
+**CAPTCHA detected:**
+```
+Detected: CAPTCHA or human verification
+
+Action:
+1. Inform user: "Site requires CAPTCHA - I cannot solve these automatically"
+2. Suggest: "Please complete CAPTCHA manually if headless=false"
+3. Wait for user confirmation to continue
+```
+
+## Output
+
+Browser Hand generates:
+
+| File | Description |
+|------|-------------|
+| `screenshot_*.png` | Screenshots when requested |
+| Extracted data | Returned directly in conversation |
+
+## Dashboard Metrics
+
+- **Pages Visited** — Total page navigations
+- **Tasks Completed** — Number of successful workflows
+- **Screenshots** — Screenshots captured
+
+## Use Cases
+
+### Product Research
+
+```
+Compare prices for "Sony WH-1000XM5" on Amazon, Best Buy, and B&H Photo
+```
+
+### Appointment Booking
+
+```
+Go to https://example.com/schedule and check available appointment slots for next Tuesday
+```
+
+### Form Submission
+
+```
+Fill out the newsletter signup at https://example.com with email: user@example.com
+Take a screenshot before submitting.
+```
+
+### Data Extraction
+
+```
+Go to YCombinator's latest batch page and list the top 10 companies with their descriptions
+```
+
+### Monitoring
+
+```
+Check if https://example.com/product is in stock and notify me
+```
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Use headless=false for debugging (see what the browser is doing)
+- Take screenshots before critical actions for verification
+- Be specific with selectors — IDs and names are more reliable than classes
+- Test workflows manually first to understand page structure
+- Use max_pages_per_task to prevent infinite navigation loops
+</Note>
+
+### Common Issues
+
+**"Element not found"**  
+Page structure may differ. Try visible text instead of CSS selector, or ask for a screenshot to debug.
+
+**"Page didn't load"**  
+Some sites are slow. Increase wait time or retry.
+
+**"Got CAPTCHA"**  
+Browser Hand cannot solve CAPTCHAs. Use headless=false and solve manually.
+
+**"Login required"**  
+Provide credentials when asked. Never store them in memory.
+
+**"Site blocked automation"**  
+Some sites detect Playwright. This is a limitation of browser automation.
+
+## Security Rules
+
+<Warning>
+**Security guidelines:**
+
+- NEVER store passwords or credit card numbers
+- NEVER auto-complete payments without approval
+- NEVER navigate to URLs from untrusted sources without verification
+- NEVER fill credentials without user explicitly providing them
+- If you encounter phishing or suspicious content, warn the user immediately
+- Always verify you're on the correct domain before entering sensitive info
+</Warning>
+
+## Advanced Usage
+
+### Multi-Step Workflows
+
+```
+1. Go to Hacker News
+2. Find the top story
+3. Click through to the article
+4. Summarize the content
+5. Return to HN and check the comment thread
+6. Summarize top 3 comments
+```
+
+### Conditional Logic
+
+```
+Check if the product is in stock.
+If yes, add to cart and show me the total.
+If no, sign up for restock notifications.
+```
+
+### Scheduled Monitoring
+
+```
+Every day at 9 AM, check https://example.com/deals for new deals matching "laptop" and notify me
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Research websites for deeper analysis
+  </Card>
+  
+  <Card title="Collector Hand" icon="magnifying-glass" href="/hands/collector">
+    Monitor websites for changes
+  </Card>
+</CardGroup>

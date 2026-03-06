@@ -1,0 +1,351 @@
+---
+title: 'Lead Hand'
+description: 'Autonomous lead generation that discovers, enriches, and delivers qualified leads on a schedule'
+icon: 'chart-line'
+---
+
+## Overview
+
+Lead Hand is an AI-powered lead generation engine that continuously discovers prospects, enriches their profiles with business intelligence, and delivers qualified leads on your schedule.
+
+**Category:** Data  
+**Icon:** 📊
+
+## What It Does
+
+<Steps>
+  <Step title="Define Target Profile">
+    Configure your ideal customer profile (industry, role, company size, geography)
+  </Step>
+  
+  <Step title="Discover Leads">
+    Multi-source web research to find decision-makers matching your criteria
+  </Step>
+  
+  <Step title="Enrich & Score">
+    Gather company data, growth signals, and score each lead by fit
+  </Step>
+  
+  <Step title="Deduplicate">
+    Cross-reference against your existing database to avoid duplicates
+  </Step>
+  
+  <Step title="Deliver Reports">
+    Generate CSV/JSON/Markdown reports on your schedule (daily, weekly, etc.)
+  </Step>
+</Steps>
+
+## Configuration
+
+### Target Profile
+
+| Setting | Description | Example |
+|---------|-------------|----------|
+| **Target Industry** | Industry vertical to focus on | `SaaS`, `fintech`, `healthcare` |
+| **Target Role** | Decision-maker titles | `CTO`, `VP Engineering`, `Head of Product` |
+| **Company Size** | Filter by employee count | `startup` (1-50), `smb` (50-500), `enterprise` (500+) |
+| **Geographic Focus** | Region to prioritize | `US`, `Europe`, `APAC`, `global` |
+
+### Lead Discovery
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Lead Source** | `web_search`, `linkedin_public`, `crunchbase`, `custom` | Primary discovery method |
+| **Leads Per Report** | 10, 25, 50, 100 | Number of leads per report |
+| **Delivery Schedule** | `daily_7am`, `daily_9am`, `weekdays_8am`, `weekly_monday` | When to generate reports |
+
+### Enrichment Settings
+
+| Setting | Depth | What You Get |
+|---------|-------|-------------|
+| **Basic** | Quick | Name, title, company |
+| **Standard** | Balanced | + company size, industry, tech stack |
+| **Deep** | Thorough | + funding, recent news, social profiles |
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate lead
+```
+
+Configure your target profile:
+
+```bash
+openfang hand config lead \
+  --set target_industry="SaaS" \
+  --set target_role="CTO, VP Engineering" \
+  --set company_size="smb" \
+  --set geo_focus="US" \
+  --set delivery_schedule="daily_9am"
+```
+
+### Example Workflow
+
+```
+Target: SaaS companies (50-500 employees) in the US
+Role: CTOs and VP Engineering
+Delivery: Daily at 9 AM, 25 leads per report
+
+> Find leads for B2B SaaS dev tools targeting engineering leaders
+```
+
+Lead Hand will:
+1. Construct 5-10 search queries combining your criteria
+2. Execute web research across multiple sources
+3. Discover 50-75 raw leads (2-3x your target)
+4. Enrich each lead with company data
+5. Score and rank by fit
+6. Deduplicate against existing database
+7. Generate `lead_report_2026-03-06.csv` with top 25 leads
+
+## How It Works
+
+### 1. Target Profile Construction
+
+Builds an Ideal Customer Profile (ICP) from your settings:
+
+```json
+{
+  "industry": "SaaS",
+  "roles": ["CTO", "VP Engineering", "Head of Product"],
+  "company_size": {"min": 50, "max": 500},
+  "geography": "US",
+  "signals": ["hiring", "funding", "product launch"]
+}
+```
+
+Stored in the knowledge graph for consistency across runs.
+
+### 2. Lead Discovery
+
+Executes multi-query web research:
+
+**Query construction examples:**
+```
+"SaaS CTO hiring US"
+"SaaS companies series B funding"
+"top SaaS startups 2026"
+"50-500 employee SaaS companies US list"
+"B2B SaaS engineering leaders"
+```
+
+For each query:
+1. `web_search` to find results
+2. `web_fetch` promising company websites, LinkedIn profiles, job boards
+3. Extract structured data:
+   - Person: name, title, company
+   - Company: URL, industry, employee count
+   - Signals: hiring, funding, news
+
+**Target:** 2-3x your `leads_per_report` setting for quality filtering.
+
+### 3. Lead Enrichment
+
+Based on `enrichment_depth` setting:
+
+#### Basic Enrichment
+- Name, title, company (from discovery)
+
+#### Standard Enrichment
+Additionally fetches:
+- Company website → extract employee count, industry, tech stack, product description
+- Job boards → hiring signals (growth indicator)
+
+#### Deep Enrichment
+Additionally fetches:
+- Recent funding news: `web_search "[company] funding round"`
+- Recent company news: `web_search "[company] news 2026"`
+- Social profiles: `web_search "[name] [company] linkedin twitter"`
+
+**Knowledge graph storage:**
+```javascript
+knowledge_add_entity({type: "lead", name: "Jane Smith", title: "CTO"})
+knowledge_add_entity({type: "company", name: "Acme SaaS Inc", industry: "SaaS"})
+knowledge_add_relation({from: "Jane Smith", to: "Acme SaaS Inc", type: "works_at"})
+```
+
+### 4. Scoring & Ranking
+
+Each lead scored 0-100:
+
+| Criteria | Points | Example |
+|----------|--------|----------|
+| **ICP Match** | +30 | Industry, role, size, geo all match |
+| **Growth Signals** | +20 | Hiring, funding, recent news |
+| **Enrichment Completeness** | +20 | All fields populated |
+| **Recency** | +15 | Company active recently |
+| **Accessibility** | +15 | Public contact info available |
+
+Example:
+```
+Jane Smith, CTO @ Acme SaaS Inc
+Score: 85/100
+- ICP match: 30/30 (SaaS, CTO, 120 employees, US)
+- Growth: 18/20 (hiring 3 engineers, Series B last year)
+- Enrichment: 20/20 (full profile)
+- Recency: 12/15 (news from 2 months ago)
+- Accessibility: 5/15 (LinkedIn public, email pattern inferred)
+```
+
+### 5. Deduplication
+
+Compares against `leads_database.json`:
+
+```javascript
+// Normalize and match
+const key = `${normalizeCompanyName(lead.company)}_${normalizeName(lead.name)}`
+
+if (existingLeads.has(key)) {
+  // Update existing lead with new enrichment data
+  leads[key] = mergeEnrichment(existing, newData)
+} else {
+  // Add new lead
+  leads[key] = newLead
+}
+```
+
+### 6. Report Generation
+
+Generate report in configured format:
+
+#### CSV Format
+```csv
+Name,Title,Company,Company URL,Industry,Company Size,Score,Discovery Date,Notes
+Jane Smith,CTO,Acme SaaS Inc,https://acmesaas.com,SaaS,120,85,2026-03-06,"Hiring engineers, Series B funded"
+```
+
+#### JSON Format
+```json
+[
+  {
+    "name": "Jane Smith",
+    "title": "CTO",
+    "company": "Acme SaaS Inc",
+    "company_url": "https://acmesaas.com",
+    "industry": "SaaS",
+    "size": 120,
+    "score": 85,
+    "discovered": "2026-03-06",
+    "enrichment": {
+      "funding": "Series B, $15M",
+      "hiring": true,
+      "tech_stack": ["React", "Python", "PostgreSQL"]
+    }
+  }
+]
+```
+
+#### Markdown Table Format
+```markdown
+| # | Name | Title | Company | Score | Signal |
+|---|------|-------|---------|-------|--------|
+| 1 | Jane Smith | CTO | Acme SaaS Inc | 85 | Hiring, Series B |
+```
+
+Saved as: `lead_report_YYYY-MM-DD.{csv,json,md}`
+
+## Output
+
+Lead Hand generates:
+
+| File | Description |
+|------|-------------|
+| `lead_report_YYYY-MM-DD.*` | Daily/weekly lead report in your chosen format |
+| `leads_database.json` | Cumulative database of all discovered leads |
+
+## Dashboard Metrics
+
+- **Leads Found** — Total unique leads discovered
+- **Reports Generated** — Number of reports delivered
+- **Last Report** — Date of most recent report
+- **Unique Companies** — Count of unique companies in database
+
+## Scheduling
+
+Lead Hand runs automatically on your configured schedule:
+
+```bash
+# Check active schedules
+openfang schedule list
+
+# Example output:
+Schedule: lead-hand-daily
+Frequency: daily at 09:00
+Last run: 2026-03-06 09:00:00
+Next run: 2026-03-07 09:00:00
+```
+
+Manual trigger:
+```
+> Generate a lead report now
+```
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Start with Standard enrichment depth — Deep can be slow for large batches
+- Use specific role titles — "VP Engineering" works better than "executive"
+- Combine with Researcher Hand to verify company fit before outreach
+- Export to CSV and import into your CRM
+- Review leads weekly to refine your ICP criteria
+</Note>
+
+### Common Issues
+
+**"No leads found"**  
+Broaden your criteria — try removing geography filter or increasing company size range.
+
+**"Too many duplicate leads"**  
+Lead Hand deduplicates automatically. If you're seeing repeats, delete `leads_database.json` to reset.
+
+**"Enrichment data missing"**  
+Some companies have minimal public data. Lower scoring leads often have incomplete profiles.
+
+**"Wrong industry/role in results"**  
+Web search can return tangential results. Check your target_industry and target_role settings are specific.
+
+## Advanced Usage
+
+### Custom Lead Sources
+
+```
+Find leads from companies mentioned in this Crunchbase list: [URL]
+```
+
+### Competitor Targeting
+
+```
+Find decision-makers at companies using [Competitor Product]
+```
+
+### Event-Based Discovery
+
+```
+Find CTOs at companies that recently raised Series A funding in fintech
+```
+
+### Export & Integration
+
+```bash
+# Export to CRM-ready format
+openfang hand run lead --export-format salesforce
+
+# Or use the JSON output with custom scripts
+cat lead_report_2026-03-06.json | jq '.[] | select(.score > 80)'
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Deep-dive research on your top leads
+  </Card>
+  
+  <Card title="Collector Hand" icon="magnifying-glass" href="/hands/collector">
+    Monitor competitor companies continuously
+  </Card>
+</CardGroup>

@@ -1,0 +1,531 @@
+---
+title: Security Configuration
+description: Configure authentication, rate limiting, and security features in OpenFang
+---
+
+OpenFang implements 16 discrete security layers with defense-in-depth architecture. This guide covers configuring authentication, access control, and security hardening.
+
+## Security Architecture
+
+OpenFang's security is built on multiple independent layers:
+
+<CardGroup cols={2}>
+  <Card title="16 Security Systems" icon="shield">
+    WASM sandbox, Merkle audit trail, taint tracking, Ed25519 signing, SSRF protection, secret zeroization, and more
+  </Card>
+  <Card title="Defense in Depth" icon="layers">
+    Multiple independent controls—no single point of failure
+  </Card>
+  <Card title="Zero Trust" icon="lock">
+    Capability-based permissions, privilege escalation prevention, cryptographic verification
+  </Card>
+  <Card title="Audit Trail" icon="file-signature">
+    Tamper-evident Merkle hash chain for all agent actions
+  </Card>
+</CardGroup>
+
+## API Authentication
+
+### Enable Bearer Token Authentication
+
+<Warning>
+**Production Deployment**: Always enable API authentication when exposing OpenFang to the internet.
+</Warning>
+
+```toml
+# config.toml
+api_key = "your-secure-random-api-key-here"
+api_listen = "0.0.0.0:4200"  # Bind to all interfaces
+```
+
+Generate a secure API key:
+
+```bash
+# Generate 32-byte random key
+openssl rand -base64 32
+
+# Or use OpenFang's built-in generator
+openfang keygen
+```
+
+### Using the API Key
+
+<CodeGroup>
+```bash cURL
+curl -H "Authorization: Bearer your-api-key" \
+  http://your-server:4200/api/agents
+```
+
+```python Python
+import requests
+
+headers = {
+    "Authorization": "Bearer your-api-key"
+}
+
+response = requests.get(
+    "http://your-server:4200/api/agents",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+fetch('http://your-server:4200/api/agents', {
+  headers: {
+    'Authorization': 'Bearer your-api-key'
+  }
+});
+```
+</CodeGroup>
+
+<Note>
+**Localhost Bypass**: Requests from `127.0.0.1` bypass authentication by default for local CLI usage. This can be disabled with `api_require_auth_local = true`.
+</Note>
+
+## Network Security
+
+### Bind Address Configuration
+
+```toml
+# Development: localhost only
+api_listen = "127.0.0.1:4200"
+
+# Production: all interfaces with authentication
+api_listen = "0.0.0.0:4200"
+api_key = "your-secure-api-key"
+```
+
+<Warning>
+Never bind to `0.0.0.0` without setting `api_key`. This exposes your instance to the internet without authentication.
+</Warning>
+
+### OFP Peer Network
+
+Secure peer-to-peer networking for agent collaboration:
+
+```toml
+[network]
+listen_addr = "0.0.0.0:4200"           # OFP network bind address
+shared_secret = "your-p2p-secret"      # Required for peer authentication
+```
+
+<ParamField path="listen_addr" type="string" default="127.0.0.1:4200">
+  OFP network listen address. Use `0.0.0.0` for public peer networking.
+</ParamField>
+
+<ParamField path="shared_secret" type="string" required>
+  Shared secret for HMAC-SHA256 mutual authentication. Must be identical across all peers in the network.
+</ParamField>
+
+**OFP Security Features**:
+- HMAC-SHA256 mutual authentication
+- Nonce-based replay protection
+- Constant-time verification
+- No plain-text credentials on wire
+
+## Rate Limiting
+
+OpenFang uses GCRA (Generic Cell Rate Algorithm) for cost-aware rate limiting:
+
+```toml
+# Global API rate limiting
+api_rate_limit = 100  # Requests per minute per IP
+
+# Webhook-specific rate limiting
+[webhook_trigger]
+enabled = true
+token_env = "OPENFANG_WEBHOOK_TOKEN"
+rate_limit_per_minute = 30
+```
+
+### Per-Channel Rate Limits
+
+```toml
+[telegram.overrides]
+rate_limit_per_user = 10  # Messages per user per minute
+
+[discord.overrides]
+rate_limit_per_user = 20
+
+[slack.overrides]
+rate_limit_per_user = 30
+```
+
+## Role-Based Access Control (RBAC)
+
+Multi-user support with role hierarchy:
+
+```toml
+[[users]]
+name = "Alice"
+role = "owner"  # Full system access
+channel_bindings = { telegram = "123456789" }
+
+[[users]]
+name = "Bob"
+role = "admin"  # Manage agents, view all data
+channel_bindings = { discord = "987654321" }
+
+[[users]]
+name = "Charlie"
+role = "user"   # Create and manage own agents only
+channel_bindings = { slack = "U01234567" }
+
+[[users]]
+name = "Dave"
+role = "viewer"  # Read-only access
+api_key_hash = "$2b$12$..."  # Bcrypt hash for API access
+```
+
+### Role Capabilities
+
+| Role | Capabilities |
+|------|-------------|
+| **Owner** | Full system access, manage users, modify global config |
+| **Admin** | Create/delete agents, view audit logs, modify agent configs |
+| **User** | Create and manage own agents, send messages, view own data |
+| **Viewer** | Read-only access to agents and data |
+
+## Capability-Based Permissions
+
+Agents declare required tools, kernel enforces access:
+
+```toml
+# agent.toml
+[capabilities]
+tools = ["file_read", "web_fetch"]  # Agent can ONLY use these tools
+
+# Child agents cannot exceed parent capabilities
+[capabilities]
+max_shell_commands = 0  # Disable shell access entirely
+max_file_writes = 10     # Limit file write operations
+```
+
+<Note>
+Privilege Escalation Prevention: Child agents spawned by an agent can never have more capabilities than their parent.
+</Note>
+
+## Secret Management
+
+### Environment Variables (Recommended)
+
+Store all secrets in environment variables:
+
+```bash
+# LLM API Keys
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+
+# Channel Tokens
+export TELEGRAM_BOT_TOKEN="..."
+export DISCORD_BOT_TOKEN="..."
+
+# OpenFang Secrets
+export OPENFANG_API_KEY="..."
+export OPENFANG_WEBHOOK_TOKEN="..."
+```
+
+<Warning>
+**Never commit secrets to version control**. Use `.env` files with `.gitignore` or secret management systems.
+</Warning>
+
+### Secret Zeroization
+
+OpenFang automatically wipes secrets from memory:
+
+```rust
+// API keys are wrapped in Zeroizing<String>
+// Memory is auto-wiped when dropped
+use zeroize::Zeroizing;
+
+let api_key = Zeroizing::new(std::env::var("ANTHROPIC_API_KEY")?);
+// ... use api_key ...
+// Memory is securely wiped here when api_key goes out of scope
+```
+
+## SSRF Protection
+
+Server-Side Request Forgery prevention:
+
+```toml
+[web.fetch]
+block_private_ips = true        # Block 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+block_metadata_endpoints = true # Block cloud metadata (169.254.169.254)
+max_redirects = 3               # Prevent redirect chains
+```
+
+**Blocked Targets**:
+- Private IP ranges (RFC 1918)
+- Loopback addresses (127.0.0.0/8)
+- Link-local addresses (169.254.0.0/16)
+- Cloud metadata endpoints (AWS, GCP, Azure)
+- DNS rebinding attacks
+
+## Path Traversal Prevention
+
+All file operations use canonicalized paths:
+
+```toml
+[security]
+strict_path_validation = true  # Enable path traversal protection
+allow_symlinks = false         # Block symbolic link following
+```
+
+**Protected Operations**:
+- `file_read`: Cannot escape workspace
+- `file_write`: Cannot write outside allowed directories
+- `file_delete`: Cannot delete system files
+
+## Audit Trail
+
+Tamper-evident Merkle hash chain:
+
+```toml
+[audit]
+enabled = true
+log_path = "~/.openfang/audit.jsonl"  # JSONL format
+hash_algorithm = "sha256"              # Cryptographic hashing
+```
+
+### Verify Audit Integrity
+
+```bash
+# Verify entire audit chain
+openfang audit verify
+
+# View audit log for specific agent
+openfang audit show --agent researcher
+
+# Export audit log
+openfang audit export --format json > audit-2026-03.json
+```
+
+**Audit Events Logged**:
+- Agent creation/deletion
+- Tool invocations
+- File system access
+- Network requests
+- Model API calls
+- Configuration changes
+
+## Prompt Injection Scanning
+
+Skill content is scanned for injection attempts:
+
+```toml
+[security]
+prompt_injection_scan = true
+```
+
+**Detection Patterns**:
+- Override attempts ("Ignore previous instructions")
+- Data exfiltration ("Send system info to...")
+- Shell reference injection
+- Base64-encoded payloads
+
+## WASM Sandbox
+
+Tool code runs in WebAssembly with dual metering:
+
+```toml
+[security.wasm]
+fuel_limit = 10_000_000         # Instruction fuel limit
+epoch_timeout_ms = 5000         # Watchdog thread timeout
+max_memory_pages = 256          # Max WASM memory (16MB)
+```
+
+<Note>
+**Dual Metering**: Fuel metering catches infinite loops, epoch interruption catches sleep/wait attacks. A watchdog thread forcibly kills runaway code.
+</Note>
+
+## Security Headers
+
+HTTP security headers on all responses:
+
+```toml
+[security.headers]
+csp = "default-src 'self'; script-src 'self' 'unsafe-inline'"
+x_frame_options = "DENY"
+x_content_type_options = "nosniff"
+strict_transport_security = "max-age=31536000; includeSubDomains"
+```
+
+**Headers Applied**:
+- `Content-Security-Policy`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Strict-Transport-Security`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+## Docker Sandbox (Optional)
+
+Run code execution in isolated Docker containers:
+
+```toml
+[security.docker]
+enabled = true
+image = "python:3.12-slim"
+network = "none"              # No network access
+memory_limit = "512m"
+cpu_limit = 1.0
+timeout_secs = 60
+read_only_root = true
+pids_limit = 100
+```
+
+<Warning>
+Docker sandbox requires Docker daemon access. Use WASM sandbox for lightweight isolation without Docker dependency.
+</Warning>
+
+## Production Security Checklist
+
+<Steps>
+  <Step title="Enable API Authentication">
+    Set `api_key` in `config.toml` with a strong random key (32+ characters)
+  </Step>
+  
+  <Step title="Configure Network Binding">
+    Use `api_listen = "0.0.0.0:4200"` with authentication, or `127.0.0.1:4200` for local-only
+  </Step>
+  
+  <Step title="Enable Rate Limiting">
+    Set `api_rate_limit` and per-channel `rate_limit_per_user`
+  </Step>
+  
+  <Step title="Configure RBAC">
+    Define users with appropriate roles (owner/admin/user/viewer)
+  </Step>
+  
+  <Step title="Enable Audit Logging">
+    Set `audit.enabled = true` and monitor audit trail
+  </Step>
+  
+  <Step title="Restrict File Access">
+    Enable `strict_path_validation` and disable `allow_symlinks`
+  </Step>
+  
+  <Step title="Configure SSRF Protection">
+    Enable `block_private_ips` and `block_metadata_endpoints`
+  </Step>
+  
+  <Step title="Use Environment Variables for Secrets">
+    Never hardcode API keys in config files
+  </Step>
+  
+  <Step title="Enable HTTPS (Reverse Proxy)">
+    Use nginx/Caddy with TLS certificates in front of OpenFang
+  </Step>
+  
+  <Step title="Regular Security Updates">
+    Keep OpenFang updated: `openfang update`
+  </Step>
+</Steps>
+
+## Reverse Proxy (HTTPS)
+
+### Nginx Configuration
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name agents.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/agents.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/agents.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:4200;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Caddy Configuration
+
+```caddy
+agents.example.com {
+    reverse_proxy localhost:4200
+}
+```
+
+## Firewall Rules
+
+```bash
+# UFW (Ubuntu)
+sudo ufw allow 4200/tcp  # OpenFang API
+sudo ufw allow 443/tcp   # HTTPS
+sudo ufw enable
+
+# iptables
+sudo iptables -A INPUT -p tcp --dport 4200 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+```
+
+## Security Monitoring
+
+```bash
+# View security events
+openfang logs --level warn
+
+# Monitor failed authentication attempts
+openfang audit show --filter auth_failed
+
+# Check rate limit violations
+openfang metrics --filter rate_limit
+
+# Verify audit chain integrity
+openfang audit verify
+```
+
+## Incident Response
+
+### Revoke Compromised API Key
+
+```bash
+# Generate new API key
+openfang keygen
+
+# Update config.toml with new key
+# Restart OpenFang
+openfang restart
+
+# Check who accessed with old key
+openfang audit show --filter api_key
+```
+
+### Disable Compromised User
+
+```toml
+# config.toml
+[[users]]
+name = "CompromisedUser"
+role = "viewer"  # Downgrade to read-only
+enabled = false  # Disable entirely
+```
+
+## Security Reporting
+
+**Found a vulnerability?** Report it responsibly:
+
+- **Email**: security@openfang.ai
+- **Do NOT** open public GitHub issues for security issues
+- **Expect**: Acknowledgment within 48 hours, fix within 14 days
+
+See [SECURITY.md](https://github.com/RightNow-AI/openfang/blob/main/SECURITY.md) for full policy.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration Overview" icon="gear" href="/configuration/overview">
+    Complete configuration guide
+  </Card>
+  <Card title="Deployment" icon="server" href="/guides/production">
+    Production deployment best practices
+  </Card>
+</CardGroup>

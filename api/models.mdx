@@ -1,0 +1,564 @@
+---
+title: 'Models API'
+description: 'Model catalog, providers, and cost tracking'
+---
+
+## Overview
+
+The Models API provides access to OpenFang's comprehensive model catalog with 100+ models from 30+ providers, including cost tracking and authentication management.
+
+## List Models
+
+Get all available models from the catalog:
+
+```bash GET /api/models
+curl http://127.0.0.1:4200/api/models
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "claude-sonnet-4-20250514",
+    "display_name": "Claude Sonnet 4",
+    "provider": "anthropic",
+    "tier": "smart",
+    "context_window": 200000,
+    "max_output_tokens": 8192,
+    "input_cost_per_m": 3.0,
+    "output_cost_per_m": 15.0,
+    "supports_tools": true,
+    "supports_vision": true,
+    "supports_streaming": true,
+    "aliases": ["sonnet", "claude-sonnet", "sonnet-4"]
+  },
+  {
+    "id": "gpt-4.1-turbo",
+    "display_name": "GPT-4.1 Turbo",
+    "provider": "openai",
+    "tier": "frontier",
+    "context_window": 128000,
+    "max_output_tokens": 4096,
+    "input_cost_per_m": 10.0,
+    "output_cost_per_m": 30.0,
+    "supports_tools": true,
+    "supports_vision": true,
+    "supports_streaming": true,
+    "aliases": ["gpt4", "gpt-4"]
+  }
+]
+```
+</ResponseExample>
+
+## Get Model
+
+Retrieve detailed information about a specific model:
+
+```bash GET /api/models/{id}
+curl http://127.0.0.1:4200/api/models/claude-sonnet-4-20250514
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": "claude-sonnet-4-20250514",
+  "display_name": "Claude Sonnet 4",
+  "provider": "anthropic",
+  "tier": "smart",
+  "context_window": 200000,
+  "max_output_tokens": 8192,
+  "input_cost_per_m": 3.0,
+  "output_cost_per_m": 15.0,
+  "supports_tools": true,
+  "supports_vision": true,
+  "supports_streaming": true,
+  "aliases": ["sonnet", "claude-sonnet", "sonnet-4"]
+}
+```
+</ResponseExample>
+
+## Model Tiers
+
+Models are categorized by capability and cost:
+
+<ParamField name="frontier" type="tier">
+  Cutting-edge, most capable models (e.g., Claude Opus, GPT-4.1)
+  
+  **Cost**: Highest | **Performance**: Best
+</ParamField>
+
+<ParamField name="smart" type="tier">
+  Intelligent, cost-effective models (e.g., Claude Sonnet, Gemini 2.5 Flash)
+  
+  **Cost**: Medium | **Performance**: Excellent
+</ParamField>
+
+<ParamField name="balanced" type="tier">
+  Balanced speed/cost models (e.g., GPT-4o-mini, Groq Llama)
+  
+  **Cost**: Low | **Performance**: Good
+</ParamField>
+
+<ParamField name="fast" type="tier">
+  Fastest, cheapest models for simple tasks
+  
+  **Cost**: Very Low | **Performance**: Adequate
+</ParamField>
+
+<ParamField name="local" type="tier">
+  Local models (Ollama, vLLM, LM Studio)
+  
+  **Cost**: Free | **Performance**: Varies
+</ParamField>
+
+<ParamField name="custom" type="tier">
+  User-defined custom models added at runtime
+  
+  **Cost**: User-defined | **Performance**: Varies
+</ParamField>
+
+## List Providers
+
+Get all model providers with authentication status:
+
+```bash GET /api/providers
+curl http://127.0.0.1:4200/api/providers
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "anthropic",
+    "display_name": "Anthropic",
+    "api_key_env": "ANTHROPIC_API_KEY",
+    "base_url": "https://api.anthropic.com",
+    "key_required": true,
+    "auth_status": "configured",
+    "model_count": 8
+  },
+  {
+    "id": "openai",
+    "display_name": "OpenAI",
+    "api_key_env": "OPENAI_API_KEY",
+    "base_url": "https://api.openai.com/v1",
+    "key_required": true,
+    "auth_status": "missing",
+    "model_count": 12
+  },
+  {
+    "id": "ollama",
+    "display_name": "Ollama",
+    "api_key_env": "",
+    "base_url": "http://localhost:11434/v1",
+    "key_required": false,
+    "auth_status": "not_required",
+    "model_count": 0
+  }
+]
+```
+</ResponseExample>
+
+## Provider Authentication
+
+### Set API Key
+
+Configure a provider's API key:
+
+```bash POST /api/providers/{name}/key
+curl -X POST http://127.0.0.1:4200/api/providers/anthropic/key \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key": "sk-ant-..."
+  }'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "configured",
+  "provider": "anthropic",
+  "env_var": "ANTHROPIC_API_KEY"
+}
+```
+</ResponseExample>
+
+<Info>
+API keys are stored in environment variables and **never** written to config files.
+</Info>
+
+### Delete API Key
+
+Remove a provider's API key:
+
+```bash DELETE /api/providers/{name}/key
+curl -X DELETE http://127.0.0.1:4200/api/providers/anthropic/key
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "removed",
+  "provider": "anthropic"
+}
+```
+</ResponseExample>
+
+### Test Provider
+
+Verify provider authentication by making a test API call:
+
+```bash POST /api/providers/{name}/test
+curl -X POST http://127.0.0.1:4200/api/providers/anthropic/test
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "success",
+  "provider": "anthropic",
+  "response_time_ms": 234
+}
+```
+</ResponseExample>
+
+### Set Provider URL
+
+Customize base URL for a provider (e.g., for proxies or custom deployments):
+
+```bash PUT /api/providers/{name}/url
+curl -X PUT http://127.0.0.1:4200/api/providers/openai/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "base_url": "https://custom-proxy.example.com/v1"
+  }'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "updated",
+  "provider": "openai",
+  "base_url": "https://custom-proxy.example.com/v1"
+}
+```
+</ResponseExample>
+
+## Authentication Status
+
+Providers report one of three authentication states:
+
+<ResponseField name="configured" type="status">
+  API key is present and valid
+</ResponseField>
+
+<ResponseField name="missing" type="status">
+  API key is required but not configured
+</ResponseField>
+
+<ResponseField name="not_required" type="status">
+  No API key needed (local providers)
+</ResponseField>
+
+## Model Aliases
+
+Many models have convenient aliases:
+
+```bash
+# These all resolve to claude-sonnet-4-20250514
+curl http://127.0.0.1:4200/api/models/sonnet
+curl http://127.0.0.1:4200/api/models/claude-sonnet
+curl http://127.0.0.1:4200/api/models/sonnet-4
+```
+
+### List Aliases
+
+Get all registered aliases:
+
+```bash GET /api/models/aliases
+curl http://127.0.0.1:4200/api/models/aliases
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "sonnet": "claude-sonnet-4-20250514",
+  "opus": "claude-opus-4-20250514",
+  "gpt4": "gpt-4.1-turbo",
+  "gemini": "gemini-2.5-flash"
+}
+```
+</ResponseExample>
+
+## Custom Models
+
+Add user-defined models to the catalog:
+
+### Add Custom Model
+
+```bash POST /api/models/custom
+curl -X POST http://127.0.0.1:4200/api/models/custom \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "my-fine-tuned-gpt4",
+    "display_name": "My Fine-Tuned GPT-4",
+    "provider": "openai",
+    "tier": "custom",
+    "context_window": 128000,
+    "max_output_tokens": 4096,
+    "input_cost_per_m": 12.0,
+    "output_cost_per_m": 36.0,
+    "supports_tools": true,
+    "supports_vision": false,
+    "supports_streaming": true
+  }'
+```
+
+<ResponseExample>
+```json 201 Created
+{
+  "status": "added",
+  "model_id": "my-fine-tuned-gpt4"
+}
+```
+</ResponseExample>
+
+### Remove Custom Model
+
+```bash DELETE /api/models/custom/{id}
+curl -X DELETE http://127.0.0.1:4200/api/models/custom/my-fine-tuned-gpt4
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "removed",
+  "model_id": "my-fine-tuned-gpt4"
+}
+```
+</ResponseExample>
+
+## Cost Tracking
+
+Models include pricing information for usage tracking:
+
+<ResponseField name="input_cost_per_m" type="number">
+  Cost per million input tokens (USD)
+</ResponseField>
+
+<ResponseField name="output_cost_per_m" type="number">
+  Cost per million output tokens (USD)
+</ResponseField>
+
+Example calculation:
+
+```typescript
+const inputTokens = 1000;
+const outputTokens = 500;
+const model = getModel('claude-sonnet-4-20250514');
+
+const inputCost = (inputTokens / 1_000_000) * model.input_cost_per_m;
+const outputCost = (outputTokens / 1_000_000) * model.output_cost_per_m;
+const totalCost = inputCost + outputCost;
+
+console.log(`Total cost: $${totalCost.toFixed(6)}`);
+// Total cost: $0.010500
+```
+
+## Usage Tracking
+
+Track usage across agents and models:
+
+### Get Usage Stats
+
+```bash GET /api/usage
+curl http://127.0.0.1:4200/api/usage
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "total_input_tokens": 1234567,
+  "total_output_tokens": 654321,
+  "total_cost_usd": 12.34,
+  "period_start": "2025-03-01T00:00:00Z",
+  "period_end": "2025-03-06T12:00:00Z"
+}
+```
+</ResponseExample>
+
+### Usage by Model
+
+```bash GET /api/usage/by-model
+curl http://127.0.0.1:4200/api/usage/by-model
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "model": "claude-sonnet-4-20250514",
+    "input_tokens": 800000,
+    "output_tokens": 400000,
+    "cost_usd": 8.40,
+    "requests": 156
+  },
+  {
+    "model": "gpt-4.1-turbo",
+    "input_tokens": 434567,
+    "output_tokens": 254321,
+    "cost_usd": 12.96,
+    "requests": 89
+  }
+]
+```
+</ResponseExample>
+
+## Supported Providers
+
+<Accordion title="Cloud Providers (20+)">
+  - **Anthropic** - Claude models
+  - **OpenAI** - GPT models
+  - **Google** - Gemini models
+  - **DeepSeek** - DeepSeek models
+  - **Groq** - Ultra-fast inference
+  - **OpenRouter** - Multi-provider router
+  - **Mistral** - Mistral models
+  - **Together** - Open-source models
+  - **Fireworks** - Fast inference
+  - **Perplexity** - Search-augmented models
+  - **Cohere** - Command models
+  - **AI21** - Jamba models
+  - **Cerebras** - Fast inference
+  - **SambaNova** - Fast inference
+  - **Hugging Face** - Inference API
+  - **xAI** - Grok models
+  - **Replicate** - Model marketplace
+  - **GitHub Copilot** - Claude via GitHub
+  - **AWS Bedrock** - Multi-provider on AWS
+</Accordion>
+
+<Accordion title="Chinese Providers (8)">
+  - **Qwen** - Alibaba Cloud
+  - **MiniMax** - Abab models
+  - **Zhipu** - GLM models
+  - **Moonshot** - Moonshot models
+  - **Qianfan** - Baidu
+  - **Volcengine** - ByteDance
+</Accordion>
+
+<Accordion title="Local Providers (3)">
+  - **Ollama** - Local model runner
+  - **vLLM** - High-performance local inference
+  - **LM Studio** - Desktop model runner
+</Accordion>
+
+## Provider Base URLs
+
+Default base URLs for each provider:
+
+```typescript
+const PROVIDER_URLS = {
+  anthropic: "https://api.anthropic.com",
+  openai: "https://api.openai.com/v1",
+  gemini: "https://generativelanguage.googleapis.com",
+  deepseek: "https://api.deepseek.com/v1",
+  groq: "https://api.groq.com/openai/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+  mistral: "https://api.mistral.ai/v1",
+  together: "https://api.together.xyz/v1",
+  fireworks: "https://api.fireworks.ai/inference/v1",
+  ollama: "http://localhost:11434/v1",
+  vllm: "http://localhost:8000/v1",
+  lmstudio: "http://localhost:1234/v1",
+};
+```
+
+## Model Capabilities
+
+<CardGroup cols={3}>
+  <Card title="Tool Calling" icon="wrench">
+    Model can execute function calls and use tools
+  </Card>
+  <Card title="Vision" icon="eye">
+    Model can process image inputs
+  </Card>
+  <Card title="Streaming" icon="stream">
+    Model supports streaming responses
+  </Card>
+</CardGroup>
+
+## Budget Management
+
+Set spending limits and track costs:
+
+### Get Budget Status
+
+```bash GET /api/budget
+curl http://127.0.0.1:4200/api/budget
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "limit_usd": 100.0,
+  "spent_usd": 45.67,
+  "remaining_usd": 54.33,
+  "period_start": "2025-03-01T00:00:00Z",
+  "period_end": "2025-04-01T00:00:00Z",
+  "alerts": []
+}
+```
+</ResponseExample>
+
+### Update Budget
+
+```bash PUT /api/budget
+curl -X PUT http://127.0.0.1:4200/api/budget \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit_usd": 200.0
+  }'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "updated",
+  "limit_usd": 200.0
+}
+```
+</ResponseExample>
+
+### Per-Agent Budget
+
+Track spending by individual agent:
+
+```bash GET /api/budget/agents
+curl http://127.0.0.1:4200/api/budget/agents
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+    "agent_name": "assistant",
+    "spent_usd": 23.45,
+    "input_tokens": 500000,
+    "output_tokens": 250000
+  }
+]
+```
+</ResponseExample>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agents API" icon="robot" href="/api/agents">
+    Spawn agents with specific models
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Secure your API
+  </Card>
+</CardGroup>

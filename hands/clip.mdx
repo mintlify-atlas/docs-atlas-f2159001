@@ -1,0 +1,405 @@
+---
+title: 'Clip Hand'
+description: 'Turn long-form videos into viral short clips with captions and thumbnails'
+icon: 'film'
+---
+
+## Overview
+
+Clip Hand is an AI-powered video editing agent that transforms long-form content into engaging short clips optimized for YouTube Shorts, TikTok, Instagram Reels, and other vertical video platforms.
+
+**Category:** Content  
+**Icon:** 🎬
+
+## What It Does
+
+<Steps>
+  <Step title="Download & Analyze">
+    Downloads videos from URLs (YouTube, Vimeo, Twitter, 1000+ sites) or processes local files
+  </Step>
+  
+  <Step title="Transcribe Audio">
+    Converts speech to text using Whisper (local or API), or grabs existing subtitles
+  </Step>
+  
+  <Step title="Identify Viral Moments">
+    Reads the transcript to find segments with hooks, emotional peaks, and self-contained stories
+  </Step>
+  
+  <Step title="Extract & Process">
+    Creates clips, crops to vertical format (9:16), burns captions, and generates thumbnails
+  </Step>
+  
+  <Step title="Publish (Optional)">
+    Automatically posts clips to Telegram channels or WhatsApp
+  </Step>
+</Steps>
+
+## Requirements
+
+<Warning>
+Clip Hand requires several external tools to function. Install them before activating the Hand.
+</Warning>
+
+### FFmpeg
+
+Core video processing engine for extraction, cropping, and caption burning.
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Windows
+winget install Gyan.FFmpeg
+
+# Linux (Ubuntu/Debian)
+sudo apt install ffmpeg
+
+# Linux (Fedora)
+sudo dnf install ffmpeg-free
+
+# Linux (Arch)
+sudo pacman -S ffmpeg
+```
+
+### yt-dlp
+
+Downloads videos from YouTube, Vimeo, Twitter, and 1000+ other sites.
+
+```bash
+# macOS
+brew install yt-dlp
+
+# Windows
+winget install yt-dlp.yt-dlp
+
+# Linux (Ubuntu/Debian)
+sudo apt install yt-dlp
+
+# Or via pip (all platforms)
+pip install yt-dlp
+```
+
+### Speech-to-Text (Choose One)
+
+**Option 1: Groq Whisper API** (recommended — fast and free tier)
+```bash
+export GROQ_API_KEY=your_key_here
+```
+
+**Option 2: OpenAI Whisper API**
+```bash
+export OPENAI_API_KEY=your_key_here
+```
+
+**Option 3: Local Whisper**
+```bash
+pip install openai-whisper
+# Or for 4x faster performance:
+pip install whisper-ctranslate2
+```
+
+## Configuration
+
+### Speech-to-Text Settings
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **STT Provider** | `auto`, `groq_whisper`, `openai_whisper`, `deepgram`, `whisper_local` | How audio is transcribed to text |
+
+**Recommendation:** Use `groq_whisper` for the best balance of speed, quality, and cost (free tier available).
+
+### Text-to-Speech (Optional)
+
+Add voice-overs to clips:
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **TTS Provider** | `none`, `edge_tts`, `openai_tts`, `elevenlabs` | Optional narration generation |
+
+- **None** — Captions only (default)
+- **Edge TTS** — Free, no API key required
+- **OpenAI TTS** — High quality, requires API key
+- **ElevenLabs** — Premium quality, requires API key
+
+### Publishing Settings
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Publish Target** | `local_only`, `telegram`, `whatsapp`, `both` | Where to send finished clips |
+
+#### Telegram Publishing
+
+Requires:
+- **Bot Token** from [@BotFather](https://t.me/BotFather)
+- **Chat ID** of your channel or group
+
+```bash
+# Get your chat ID from @userinfobot
+# Channel format: -100XXXXXXXXXX or @channelname
+# Make your bot an admin in the channel
+```
+
+#### WhatsApp Publishing
+
+Requires Meta Business account with WhatsApp Cloud API:
+- **Access Token** (permanent, not temporary)
+- **Phone Number ID** from Meta Developer Portal
+- **Recipient** phone number (international format, no +)
+
+<Note>
+Publishing is optional. By default, Clip Hand saves clips locally without uploading.
+</Note>
+
+## Activation
+
+### Basic Usage
+
+```bash
+openfang hand activate clip
+```
+
+Then send the Hand a video URL or file path:
+
+```
+Create clips from this video: https://youtube.com/watch?v=example
+```
+
+### Example Workflow
+
+```bash
+# 1. Activate Clip Hand
+openfang hand activate clip
+
+# 2. Configure settings (optional)
+openfang hand config clip --set stt_provider=groq_whisper
+
+# 3. Send a task
+> Create 3 clips from https://youtube.com/watch?v=dQw4w9WgXcQ
+
+# Clip Hand will:
+# - Download the video
+# - Transcribe with Groq Whisper
+# - Analyze the transcript for viral moments
+# - Extract 3 clips
+# - Crop to vertical (1080x1920)
+# - Burn captions
+# - Generate thumbnails
+# - Save as clip_1_final.mp4, clip_2_final.mp4, clip_3_final.mp4
+```
+
+## How It Works
+
+### 1. Intake & Download
+
+For URLs:
+```bash
+# Fetches video metadata
+yt-dlp --dump-json "URL"
+
+# Downloads best quality up to 1080p
+yt-dlp -f "bv[height<=1080]+ba/b[height<=1080]" -o "source.%(ext)s" "URL"
+
+# Attempts to grab existing subtitles (skips transcription if found)
+yt-dlp --write-auto-subs --sub-lang en --sub-format json3 --skip-download -o "source" "URL"
+```
+
+For local files:
+```bash
+# Analyzes video metadata
+ffprobe -v quiet -print_format json -show_format -show_streams "file.mp4"
+```
+
+### 2. Transcription
+
+**Path A: YouTube Auto-Subs** (fastest — no transcription needed)  
+Parses the json3 subtitle file for word-level timing.
+
+**Path B: Groq Whisper API** (recommended)
+```bash
+# Extract audio
+ffmpeg -i source.mp4 -vn -ar 16000 -ac 1 audio.wav
+
+# Transcribe via Groq API
+curl -X POST "https://api.groq.com/openai/v1/audio/transcriptions" \
+  -H "Authorization: Bearer $GROQ_API_KEY" \
+  -F "file=@audio.wav" -F "model=whisper-large-v3" \
+  -F "response_format=verbose_json" -F "timestamp_granularities[]=word"
+```
+
+**Path C: Local Whisper** (slowest, but free and private)
+```bash
+whisper audio.wav --model small --output_format json --word_timestamps true
+```
+
+### 3. Viral Segment Selection
+
+The Hand analyzes the full transcript looking for:
+
+- **Hook in first 3 seconds** — Surprising claim, question, emotional statement
+- **Self-contained story** — Makes sense without the full video
+- **Emotional peaks** — Laughter, surprise, anger, vulnerability
+- **Contrarian takes** — Things people want to share or argue about
+- **Clean ending** — Punchline, conclusion, or dramatic pause
+
+Typical output:
+```
+Selected 3 segments:
+1. 00:01:23 - 00:02:15 — "The moment I realized I was wrong"
+2. 00:05:40 - 00:06:30 — "Why everyone gets this wrong"
+3. 00:12:10 - 00:13:00 — "The surprising truth about X"
+```
+
+### 4. Clip Processing
+
+For each segment:
+
+**Step 1: Extract**
+```bash
+ffmpeg -ss 00:01:23 -to 00:02:15 -i source.mp4 \
+  -c:v libx264 -c:a aac -preset fast -crf 23 \
+  -movflags +faststart -y clip_1.mp4
+```
+
+**Step 2: Crop to Vertical (9:16)**
+```bash
+ffmpeg -i clip_1.mp4 \
+  -vf "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920" \
+  -c:a copy -y clip_1_vert.mp4
+```
+
+**Step 3: Generate SRT Captions**
+```srt
+1
+00:00:00,000 --> 00:00:02,500
+The moment I realized
+
+2
+00:00:02,500 --> 00:00:05,100
+I was completely wrong about this
+```
+
+**Step 4: Burn Captions**
+```bash
+ffmpeg -i clip_1_vert.mp4 \
+  -vf "subtitles=clip_1.srt:force_style='FontSize=22,FontName=Arial,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Alignment=2,MarginV=40'" \
+  -c:a copy -y clip_1_final.mp4
+```
+
+**Step 5: Generate Thumbnail**
+```bash
+ffmpeg -i clip_1.mp4 -ss 2 -frames:v 1 -q:v 2 -y thumb_1.jpg
+```
+
+### 5. Publishing (Optional)
+
+If configured:
+
+**Telegram:**
+```bash
+curl -X POST "https://api.telegram.org/bot$TOKEN/sendVideo" \
+  -F "chat_id=$CHAT_ID" \
+  -F "video=@clip_1_final.mp4" \
+  -F "caption=The moment I realized I was wrong" \
+  -F "supports_streaming=true"
+```
+
+**WhatsApp:**
+```bash
+# Step 1: Upload video
+curl -X POST "https://graph.facebook.com/v21.0/$PHONE_ID/media" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@clip_1_final.mp4" \
+  -F "messaging_product=whatsapp"
+
+# Step 2: Send message
+curl -X POST "https://graph.facebook.com/v21.0/$PHONE_ID/messages" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"messaging_product":"whatsapp","to":"14155551234","type":"video","video":{"id":"MEDIA_ID","caption":"Clip title"}}'
+```
+
+## Output
+
+Clip Hand generates:
+
+| File | Description |
+|------|-------------|
+| `clip_N_final.mp4` | Processed clip with captions, ready to post |
+| `clip_N.srt` | Subtitle file (if you want to edit captions) |
+| `thumb_N.jpg` | Thumbnail image |
+| `transcript.json` | Full transcript with word-level timing |
+
+## Dashboard Metrics
+
+Track performance in the OpenFang dashboard:
+
+- **Jobs Completed** — Total video processing jobs
+- **Clips Generated** — Number of clips created
+- **Total Duration** — Cumulative clip length
+- **Published to Telegram** — Clips sent to Telegram
+- **Published to WhatsApp** — Clips sent to WhatsApp
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Use videos with clear speech (podcasts, interviews, lectures work great)
+- Longer source videos (15+ minutes) give more clip options
+- Let the Hand pick segments — its transcript analysis finds better moments than random timestamps
+- Review clips before publishing to channels with large audiences
+</Note>
+
+### Common Issues
+
+**"yt-dlp not found"**  
+Install yt-dlp: `pip install yt-dlp`
+
+**"FFmpeg not found"**  
+Install FFmpeg for your platform (see Requirements above)
+
+**"Transcription failed"**  
+Check your API key is set: `echo $GROQ_API_KEY`  
+Or install local Whisper: `pip install openai-whisper`
+
+**"Telegram upload failed: file too large"**  
+Telegram limit is 50MB. The Hand will automatically re-encode larger files.
+
+**"WhatsApp upload failed: template required"**  
+Recipient must message your business number first (24-hour window).
+
+## Advanced Usage
+
+### Custom Timestamps
+
+Override automatic segment selection:
+
+```
+Create clips from video.mp4 at these timestamps:
+- 00:01:30 to 00:02:15
+- 00:05:00 to 00:05:45
+```
+
+### Custom Clip Count
+
+```
+Generate 10 clips from this video: https://youtube.com/watch?v=example
+```
+
+### Local Files
+
+```
+Process /path/to/my_video.mp4 and create 5 clips
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Twitter Hand" icon="twitter" href="/hands/twitter">
+    Post your clips to Twitter automatically
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Research trending topics for clip content
+  </Card>
+</CardGroup>

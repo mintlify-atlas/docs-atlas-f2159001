@@ -1,0 +1,518 @@
+---
+title: Workflow Commands
+description: Create and execute multi-step agent workflows
+---
+
+# Workflow Commands
+
+Workflows allow you to chain multiple agent tasks together into automated pipelines. All workflow commands require a running daemon.
+
+<Note>
+  Workflows require a running daemon. Start it with `openfang start` before using these commands.
+</Note>
+
+## Listing Workflows
+
+### openfang workflow list
+
+List all registered workflows.
+
+```bash
+openfang workflow list
+```
+
+**Example Output:**
+
+```bash
+$ openfang workflow list
+
+  Registered Workflows
+
+  ID                                    NAME               STEPS  CREATED
+  w1a2b3c4-d5e6-f7g8-h9i0-j1k2l3m4n5o6  code-review        3      2025-03-06
+  w2b3c4d5-e6f7-g8h9-i0j1-k2l3m4n5o6p7  content-pipeline   5      2025-03-05
+  w3c4d5e6-f7g8-h9i0-j1k2-l3m4n5o6p7q8  analysis-report    4      2025-03-04
+
+  Total: 3 workflows
+```
+
+**Output Columns:**
+
+- **ID** - Workflow UUID (use this for `workflow run`)
+- **NAME** - Human-readable workflow name
+- **STEPS** - Number of steps in the workflow
+- **CREATED** - Creation date
+
+## Creating Workflows
+
+### openfang workflow create
+
+Create a workflow from a JSON definition file.
+
+```bash
+openfang workflow create <FILE>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<FILE>` | Path to a JSON file describing the workflow steps |
+
+**Workflow Definition Format:**
+
+```json
+{
+  "name": "code-review",
+  "description": "Automated code review pipeline",
+  "steps": [
+    {
+      "id": "analyze",
+      "agent": "coder",
+      "prompt": "Analyze this code for security issues: {{input}}",
+      "timeout_seconds": 60
+    },
+    {
+      "id": "suggest",
+      "agent": "coder",
+      "prompt": "Based on this analysis, suggest improvements: {{steps.analyze.output}}",
+      "timeout_seconds": 60
+    },
+    {
+      "id": "document",
+      "agent": "writer",
+      "prompt": "Write a summary report: {{steps.suggest.output}}",
+      "timeout_seconds": 30
+    }
+  ]
+}
+```
+
+**Field Reference:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Workflow name |
+| `description` | string | No | Human-readable description |
+| `steps` | array | Yes | Ordered list of workflow steps |
+| `steps[].id` | string | Yes | Unique step identifier |
+| `steps[].agent` | string | Yes | Agent name or ID to execute this step |
+| `steps[].prompt` | string | Yes | Prompt template (supports `{{input}}` and `{{steps.<id>.output}}`) |
+| `steps[].timeout_seconds` | integer | No | Step timeout (default: 120) |
+
+**Example:**
+
+```bash
+$ openfang workflow create ./code-review-workflow.json
+[ok] Workflow created: code-review (w1a2b3c4-d5e6-f7g8-h9i0-j1k2l3m4n5o6)
+hint: Run it with: openfang workflow run w1a2b3c4 "<input>"
+```
+
+<Warning>
+  Workflow definitions must be valid JSON. Use a linter to validate before creating.
+</Warning>
+
+## Running Workflows
+
+### openfang workflow run
+
+Execute a workflow by ID.
+
+```bash
+openfang workflow run <WORKFLOW_ID> <INPUT>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<WORKFLOW_ID>` | Workflow UUID (obtain from `openfang workflow list`) |
+| `<INPUT>` | Input text to pass to the workflow |
+
+**Example:**
+
+```bash
+$ openfang workflow run w1a2b3c4 "Check this function for SQL injection vulnerabilities"
+
+  Running workflow: code-review
+
+  [1/3] analyze... done (12.3s)
+  [2/3] suggest... done (8.7s)
+  [3/3] document... done (4.2s)
+
+  Workflow completed in 25.2s
+
+  Final Output:
+  ────────────────────────────────────────
+  ## Code Review Summary
+
+  ### Security Issues Found
+  1. SQL Injection vulnerability on line 45
+  2. Missing input sanitization
+
+  ### Recommended Fixes
+  - Use parameterized queries
+  - Add input validation layer
+  - Implement prepared statements
+
+  ### Impact Assessment
+  High severity - immediate fix required.
+```
+
+**Real-Time Progress:**
+
+The workflow execution displays:
+- Step progress with real-time status
+- Execution time for each step
+- Total workflow duration
+- Final output from the last step
+
+<Note>
+  Each step receives the output of previous steps via template variables (`{{steps.<id>.output}}`).
+</Note>
+
+## Workflow Examples
+
+### Content Creation Pipeline
+
+```json
+{
+  "name": "content-pipeline",
+  "description": "Research, write, edit, and optimize content",
+  "steps": [
+    {
+      "id": "research",
+      "agent": "researcher",
+      "prompt": "Research the topic: {{input}}",
+      "timeout_seconds": 120
+    },
+    {
+      "id": "draft",
+      "agent": "writer",
+      "prompt": "Write a blog post based on this research: {{steps.research.output}}",
+      "timeout_seconds": 180
+    },
+    {
+      "id": "edit",
+      "agent": "writer",
+      "prompt": "Edit and improve this draft: {{steps.draft.output}}",
+      "timeout_seconds": 120
+    },
+    {
+      "id": "seo",
+      "agent": "writer",
+      "prompt": "Optimize for SEO with keywords from: {{input}}. Content: {{steps.edit.output}}",
+      "timeout_seconds": 60
+    },
+    {
+      "id": "meta",
+      "agent": "writer",
+      "prompt": "Generate SEO title and meta description for: {{steps.seo.output}}",
+      "timeout_seconds": 30
+    }
+  ]
+}
+```
+
+**Usage:**
+
+```bash
+openfang workflow create content-pipeline.json
+openfang workflow run <WORKFLOW_ID> "The future of AI in healthcare"
+```
+
+### Code Analysis & Documentation
+
+```json
+{
+  "name": "code-documentation",
+  "description": "Analyze code and generate comprehensive documentation",
+  "steps": [
+    {
+      "id": "analyze",
+      "agent": "coder",
+      "prompt": "Analyze this codebase structure and dependencies: {{input}}",
+      "timeout_seconds": 90
+    },
+    {
+      "id": "architecture",
+      "agent": "architect",
+      "prompt": "Describe the architecture based on: {{steps.analyze.output}}",
+      "timeout_seconds": 120
+    },
+    {
+      "id": "api-docs",
+      "agent": "technical-writer",
+      "prompt": "Generate API documentation from: {{steps.analyze.output}}",
+      "timeout_seconds": 180
+    },
+    {
+      "id": "readme",
+      "agent": "technical-writer",
+      "prompt": "Create a README.md with setup instructions: {{steps.architecture.output}}",
+      "timeout_seconds": 90
+    }
+  ]
+}
+```
+
+### Data Analysis Pipeline
+
+```json
+{
+  "name": "data-analysis",
+  "description": "Load, analyze, visualize, and report on data",
+  "steps": [
+    {
+      "id": "load",
+      "agent": "analyst",
+      "prompt": "Load and validate this dataset: {{input}}",
+      "timeout_seconds": 60
+    },
+    {
+      "id": "explore",
+      "agent": "analyst",
+      "prompt": "Perform exploratory data analysis: {{steps.load.output}}",
+      "timeout_seconds": 120
+    },
+    {
+      "id": "visualize",
+      "agent": "analyst",
+      "prompt": "Create visualizations for key insights: {{steps.explore.output}}",
+      "timeout_seconds": 90
+    },
+    {
+      "id": "report",
+      "agent": "writer",
+      "prompt": "Write an executive summary report: {{steps.visualize.output}}",
+      "timeout_seconds": 60
+    }
+  ]
+}
+```
+
+## Template Variables
+
+Workflow prompts support Handlebars-style template variables:
+
+### Input Variable
+
+References the initial workflow input:
+
+```json
+{
+  "prompt": "Analyze this topic: {{input}}"
+}
+```
+
+### Step Output Variables
+
+References the output of previous steps:
+
+```json
+{
+  "prompt": "Based on this analysis: {{steps.analyze.output}}, suggest improvements."
+}
+```
+
+### Multiple References
+
+```json
+{
+  "prompt": "Combine research ({{steps.research.output}}) with user input ({{input}}) to create content."
+}
+```
+
+<Note>
+  Step outputs are only available after the step has completed. Reference only previous steps in the chain.
+</Note>
+
+## Error Handling
+
+### Step Timeout
+
+If a step exceeds its timeout, the workflow fails:
+
+```bash
+$ openfang workflow run w1a2b3c4 "Complex analysis task"
+
+  Running workflow: code-review
+
+  [1/3] analyze... done (12.3s)
+  [2/3] suggest... TIMEOUT (exceeded 60s)
+
+  [!] Workflow failed: Step 'suggest' timed out
+  hint: Increase timeout_seconds for this step or use a faster model
+```
+
+**Solution:** Increase `timeout_seconds` in the workflow definition:
+
+```json
+{
+  "id": "suggest",
+  "timeout_seconds": 180  // Increased from 60
+}
+```
+
+### Agent Not Found
+
+```bash
+[!] Workflow failed: Agent 'unknown-agent' not found
+hint: Check available agents: openfang agent list
+```
+
+**Solution:** Verify agent names and spawn missing agents:
+
+```bash
+openfang agent list
+openfang agent new coder  # Spawn missing agent
+```
+
+### Invalid Template Variable
+
+```bash
+[!] Workflow failed: Template variable 'steps.nonexistent.output' not found
+hint: Check step IDs in your workflow definition
+```
+
+**Solution:** Verify step IDs match the references:
+
+```json
+{
+  "steps": [
+    {"id": "analyze", ...},  // ✓ Correct ID
+    {"id": "suggest", "prompt": "{{steps.analyze.output}}" }  // ✓ Valid reference
+  ]
+}
+```
+
+## Workflow Best Practices
+
+### 1. Keep Steps Focused
+
+❌ **Bad:** Single massive step
+
+```json
+{
+  "id": "do-everything",
+  "prompt": "Research, analyze, write, edit, and optimize content for: {{input}}"
+}
+```
+
+✓ **Good:** Multiple focused steps
+
+```json
+[
+  {"id": "research", "prompt": "Research: {{input}}"},
+  {"id": "write", "prompt": "Write based on: {{steps.research.output}}"},
+  {"id": "edit", "prompt": "Edit: {{steps.write.output}}"}
+]
+```
+
+### 2. Set Realistic Timeouts
+
+- Simple tasks: 30-60 seconds
+- Complex analysis: 90-180 seconds
+- Code generation: 60-120 seconds
+- Research: 120-300 seconds
+
+### 3. Use Appropriate Agents
+
+Match agents to task types:
+
+```json
+[
+  {"agent": "researcher", "prompt": "Research topic"},     // ✓ Good
+  {"agent": "coder", "prompt": "Write code"},            // ✓ Good
+  {"agent": "writer", "prompt": "Edit content"},         // ✓ Good
+  {"agent": "coder", "prompt": "Research biology"}      // ✗ Wrong agent
+]
+```
+
+### 4. Validate JSON Before Creating
+
+```bash
+# Validate JSON syntax
+jq empty workflow.json && echo "Valid JSON" || echo "Invalid JSON"
+
+# Pretty-print for readability
+jq . workflow.json > workflow-formatted.json
+```
+
+### 5. Test Steps Individually
+
+Before creating a workflow, test each prompt with `openfang message`:
+
+```bash
+# Test step 1
+openfang message researcher "Research AI in healthcare"
+
+# Test step 2 with sample output
+openfang message writer "Write a blog post based on: [sample research output]"
+```
+
+## Advanced Usage
+
+### Dynamic Workflows
+
+Generate workflows programmatically:
+
+```bash
+#!/bin/bash
+# generate-workflow.sh
+
+cat > dynamic-workflow.json <<EOF
+{
+  "name": "multi-language-review-$(date +%s)",
+  "steps": [
+$(for lang in python javascript rust; do
+  cat <<STEP
+    {
+      "id": "review-$lang",
+      "agent": "coder",
+      "prompt": "Review $lang code: {{input}}"
+    },
+STEP
+done | sed '$ s/,$//')
+  ]
+}
+EOF
+
+openfang workflow create dynamic-workflow.json
+```
+
+### Workflow Chaining
+
+Use the output of one workflow as input to another:
+
+```bash
+# Run workflow 1
+OUTPUT1=$(openfang workflow run w1a2b3c4 "Initial input" | tail -n 1)
+
+# Run workflow 2 with output from workflow 1
+openfang workflow run w2b3c4d5 "$OUTPUT1"
+```
+
+### Parallel Execution
+
+Currently, workflow steps execute sequentially. For parallel execution, use separate workflows:
+
+```bash
+# Start multiple workflows in parallel
+openfang workflow run w1a2b3c4 "Task 1" &
+openfang workflow run w2b3c4d5 "Task 2" &
+openfang workflow run w3c4d5e6 "Task 3" &
+wait
+echo "All workflows completed"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trigger Commands" icon="bolt" href="/cli/workflow-commands">
+    Automate workflows with event triggers
+  </Card>
+  <Card title="Skill Commands" icon="puzzle-piece" href="/cli/skill-commands">
+    Enhance workflows with custom skills
+  </Card>
+</CardGroup>

@@ -1,0 +1,491 @@
+---
+title: 'Hands'
+description: 'Autonomous capability packages that work for you'
+icon: 'hand'
+---
+
+## What Are Hands?
+
+**Hands** are OpenFang's core innovation — pre-built autonomous capability packages that run independently, on schedules, without you having to prompt them. Traditional agents wait for you to type something. Hands **work for you**.
+
+<Note>
+  A Hand is not just an agent — it's a **complete capability bundle**: manifest, system prompt, skills, tools, requirements, settings schema, and dashboard metrics.
+</Note>
+
+## Hands vs Regular Agents
+
+| Aspect | Regular Agent | Hand |
+|--------|--------------|------|
+| **Activation** | Manual spawn | One-command activation |
+| **Interaction** | You chat with it | It works for you |
+| **Scheduling** | One-off messages | 24/7 autonomous runs |
+| **Configuration** | Manifest editing | Settings modal UI |
+| **Pre-built** | You define everything | Bundled & ready |
+| **Dashboard** | Generic metrics | Custom metrics per Hand |
+
+<Accordion title="Example: Lead Generation Hand">
+  You activate the **Lead Hand** once:
+  
+  ```bash
+  openfang hand activate lead
+  ```
+  
+  From that moment:
+  - It runs **daily at 6 AM**
+  - Scrapes your ICP (Ideal Customer Profile) from web sources
+  - Enriches prospects with company data, social profiles, and contact info
+  - Scores each lead 0-100 using your criteria
+  - Deduplicates against your existing database
+  - Delivers a CSV/JSON report to your configured channel (Telegram, email, etc.)
+  
+  You check in on it. You don't prompt it.
+</Accordion>
+
+## The 7 Bundled Hands
+
+OpenFang ships with 7 production-ready Hands:
+
+<CardGroup cols={2}>
+  <Card title="Clip Hand" icon="scissors">
+    **Category**: Content  
+    Takes YouTube URLs, downloads videos, identifies highlights, cuts vertical shorts with captions/thumbnails, adds AI voice-over, publishes to Telegram/WhatsApp. 8-phase pipeline. Supports FFmpeg, yt-dlp, 5 STT backends.
+  </Card>
+  
+  <Card title="Lead Hand" icon="magnifying-glass-dollar">
+    **Category**: Productivity  
+    Daily prospect discovery matching your ICP. Enriches with web research, scores 0-100, deduplicates, delivers qualified leads. Builds ICP profiles over time.
+  </Card>
+  
+  <Card title="Collector Hand" icon="eye">
+    **Category**: Security  
+    OSINT-grade intelligence gathering. Monitors companies/people/topics continuously. Change detection, sentiment tracking, knowledge graph construction, critical alerts.
+  </Card>
+  
+  <Card title="Predictor Hand" icon="chart-line">
+    **Category**: Data  
+    Superforecasting engine. Collects signals from multiple sources, builds calibrated reasoning chains, makes predictions with confidence intervals, tracks accuracy using Brier scores. Has contrarian mode.
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask">
+    **Category**: Productivity  
+    Deep autonomous researcher. Cross-references multiple sources, evaluates credibility using CRAAP criteria, generates cited reports with APA formatting, supports multiple languages.
+  </Card>
+  
+  <Card title="Twitter Hand" icon="bird">
+    **Category**: Communication  
+    Autonomous Twitter/X account manager. Creates content in 7 rotating formats, schedules posts for optimal engagement, responds to mentions, tracks performance. Has approval queue.
+  </Card>
+  
+  
+  <Card title="Browser Hand" icon="window-maximize">
+    **Category**: Productivity  
+    Web automation agent. Navigates sites, fills forms, clicks buttons, handles multi-step workflows. Uses Playwright bridge with session persistence. **Mandatory purchase approval gate**.
+  </Card>
+</CardGroup>
+
+<Warning>
+  The Browser Hand will **never** spend your money without explicit confirmation. All purchase-like actions (checkout, payment forms) require user approval.
+</Warning>
+
+## Hand Definition (HAND.toml)
+
+Every Hand is defined by a `HAND.toml` manifest:
+
+```toml
+id = "researcher"
+name = "Researcher"
+description = "Deep autonomous research agent"
+category = "productivity"
+icon = "🔬"
+tools = ["web_search", "web_fetch", "file_write"]
+
+# Requirements that must be satisfied before activation
+[[requires]]
+key = "search_api"
+label = "Search API Key"
+requirement_type = "api_key"
+check_value = "SEARCH_API_KEY"
+
+[requires.install]
+signup_url = "https://example.com/signup"
+docs_url = "https://example.com/docs"
+env_example = "SEARCH_API_KEY=your_key_here"
+estimated_time = "5-10 min"
+steps = [
+    "Sign up at example.com",
+    "Navigate to API settings",
+    "Generate a new key",
+    "Set it as an environment variable",
+]
+
+# Configurable settings (shown in activation modal)
+[[settings]]
+key = "research_depth"
+label = "Research Depth"
+description = "How many sources to cross-reference"
+setting_type = "select"
+default = "medium"
+
+[[settings.options]]
+value = "light"
+label = "Light (3-5 sources)"
+
+[[settings.options]]
+value = "medium"
+label = "Medium (5-10 sources)"
+
+[[settings.options]]
+value = "deep"
+label = "Deep (10+ sources)"
+
+# Agent manifest template
+[agent]
+name = "researcher-hand"
+description = "Autonomous research agent"
+system_prompt = """
+You are an expert researcher with access to web search and content extraction tools.
+
+Your goal is to conduct thorough research on any topic assigned to you:
+- Cross-reference multiple authoritative sources
+- Evaluate credibility using CRAAP criteria (Currency, Relevance, Authority, Accuracy, Purpose)
+- Synthesize findings into a coherent report with citations
+- Highlight contradictions or gaps in the literature
+
+Always cite your sources using APA format.
+"""
+module = "builtin:chat"
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+max_tokens = 4096
+temperature = 0.7
+
+# Dashboard metrics (read from agent's structured memory)
+[dashboard]
+[[dashboard.metrics]]
+label = "Reports Generated"
+memory_key = "reports_count"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Sources Analyzed"
+memory_key = "sources_analyzed"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Avg Research Time"
+memory_key = "avg_research_time_minutes"
+format = "duration"
+```
+
+<Accordion title="Hand Settings Schema">
+  Settings are **typed and validated** before activation:
+  
+  ```rust
+  pub enum HandSettingType {
+      Select,   // Dropdown with predefined options
+      Text,     // Free-form text input
+      Toggle,   // Boolean on/off
+  }
+  
+  pub struct HandSetting {
+      pub key: String,
+      pub label: String,
+      pub setting_type: HandSettingType,
+      pub default: String,
+      pub options: Vec<HandSettingOption>,  // For Select type
+  }
+  ```
+  
+  At activation time, the kernel:
+  1. Validates user-provided settings against the schema
+  2. Resolves provider environment variables (e.g., `GROQ_API_KEY` for a Groq option)
+  3. Injects a settings block into the agent's system prompt
+  4. Stores the config in the Hand instance
+</Accordion>
+
+## Hand Lifecycle
+
+<Steps>
+  <Step title="Discovery">
+    User browses available Hands in the dashboard or CLI:
+    
+    ```bash
+    openfang hand list
+    ```
+    
+    Output:
+    ```
+    researcher    Productivity   Deep autonomous research agent
+    lead          Productivity   Daily lead generation and ICP matching
+    collector     Security       OSINT intelligence gathering
+    twitter       Communication  Autonomous Twitter/X account manager
+    ...
+    ```
+  </Step>
+  
+  <Step title="Requirement Validation">
+    Before activation, OpenFang checks all requirements:
+    
+    - **Binary requirements**: Checks if `ffmpeg`, `whisper`, etc. are on PATH
+    - **API key requirements**: Checks if environment variables are set
+    - **Env var requirements**: Validates custom env vars
+    
+    If requirements are missing, the UI shows platform-specific install instructions from `HAND.toml`.
+  </Step>
+  
+  <Step title="Configuration">
+    User provides settings in the activation modal (web UI) or via CLI flags:
+    
+    ```bash
+    openfang hand activate researcher \
+      --set research_depth=deep \
+      --set output_format=markdown
+    ```
+  </Step>
+  
+  <Step title="Agent Spawning">
+    The kernel:
+    1. Creates a new `HandInstance` with a unique UUID
+    2. Resolves settings into a prompt block and env var list
+    3. Spawns an agent using the Hand's `agent` template
+    4. Injects the settings prompt block into the system prompt
+    5. Grants the agent access to specified tools and skills
+    6. Stores the instance in the Hand registry
+  </Step>
+  
+  <Step title="Autonomous Execution">
+    The Hand runs on its defined schedule (e.g., daily, hourly). The kernel sends the configured trigger message to the agent, which processes it through the normal agent loop.
+  </Step>
+  
+  <Step title="Dashboard Updates">
+    After each run, the Hand writes metrics to its structured memory:
+    
+    ```rust
+    memory.set(agent_id, "reports_count", json!(5)).await?;
+    memory.set(agent_id, "sources_analyzed", json!(47)).await?;
+    ```
+    
+    The dashboard queries these keys and formats them according to the `dashboard.metrics` schema.
+  </Step>
+  
+  <Step title="Pause/Resume">
+    Users can pause a Hand without losing state:
+    
+    ```bash
+    openfang hand pause researcher
+    openfang hand resume researcher
+    ```
+    
+    Paused Hands remain in the registry but don't execute on schedule.
+  </Step>
+</Steps>
+
+## Hand Instance Management
+
+```rust
+pub struct HandInstance {
+    pub instance_id: Uuid,              // Unique instance identifier
+    pub hand_id: String,                // Which hand definition ("researcher")
+    pub status: HandStatus,             // Active/Paused/Error/Inactive
+    pub agent_id: Option<AgentId>,      // Spawned agent (if activated)
+    pub agent_name: String,
+    pub config: HashMap<String, Value>, // User-provided settings
+    pub activated_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+pub enum HandStatus {
+    Active,
+    Paused,
+    Error(String),
+    Inactive,
+}
+```
+
+Multiple instances of the same Hand can run simultaneously:
+
+```bash
+# Activate researcher for competitor analysis
+openfang hand activate researcher --name competitor-tracker
+
+# Activate another researcher for market trends
+openfang hand activate researcher --name market-trends
+```
+
+Each instance has its own agent, memory, and configuration.
+
+## Skill Injection
+
+Hands can bundle a **SKILL.md** file with domain expertise. At runtime, this is injected into the agent's context:
+
+```markdown
+# Researcher Skill
+
+## CRAAP Criteria for Source Evaluation
+
+**Currency**: When was the information published? Is it up-to-date?
+**Relevance**: Does it directly address your research question?
+**Authority**: Who is the author? What are their credentials?
+**Accuracy**: Is the information supported by evidence?
+**Purpose**: Why was this published? Is there bias?
+
+## Citation Format (APA)
+
+Web source:
+Author, A. A. (Year, Month Day). Title of page. Site Name. URL
+
+...
+```
+
+This gives the agent deep domain knowledge without bloating the system prompt.
+
+## Guardrails & Approval Gates
+
+Some Hands have **mandatory approval gates** for sensitive actions:
+
+<Accordion title="Browser Hand Purchase Protection">
+  The Browser Hand has a built-in purchase detector:
+  
+  ```rust
+  fn is_purchase_action(url: &str, action: &str) -> bool {
+      let purchase_keywords = [
+          "checkout", "payment", "buy now", "place order",
+          "confirm purchase", "billing", "credit card"
+      ];
+      
+      purchase_keywords.iter().any(|kw| {
+          url.contains(kw) || action.to_lowercase().contains(kw)
+      })
+  }
+  ```
+  
+  Before any purchase-like action:
+  1. Agent pauses execution
+  2. Sends approval request to user via configured channel
+  3. Waits for explicit `approve` or `deny` response
+  4. Times out after 5 minutes if no response
+  
+  User approves via:
+  ```bash
+  openfang approval approve <request_id>
+  ```
+</Accordion>
+
+<Accordion title="Twitter Hand Approval Queue">
+  Every tweet goes into an approval queue before posting:
+  
+  ```bash
+  openfang hand queue twitter
+  ```
+  
+  Output:
+  ```
+  [1] "Just shipped a new feature: autonomous code review! 🚀"
+  [2] "Interesting read on Rust's async ecosystem..."
+  [3] "Poll: What's your biggest agent development pain point?"
+  ```
+  
+  Approve individually or in batch:
+  ```bash
+  openfang hand approve twitter 1 3
+  openfang hand approve twitter --all
+  ```
+</Accordion>
+
+## Custom Hands
+
+You can build your own Hands:
+
+<Steps>
+  <Step title="Create HAND.toml">
+    ```toml
+    id = "my-hand"
+    name = "My Custom Hand"
+    description = "Does something useful"
+    category = "productivity"
+    tools = ["web_search", "file_write"]
+    
+    [agent]
+    name = "my-hand"
+    description = "..."
+    system_prompt = "..."
+    module = "builtin:chat"
+    provider = "anthropic"
+    model = "claude-sonnet-4-20250514"
+    
+    [dashboard]
+    metrics = []
+    ```
+  </Step>
+  
+  <Step title="Add SKILL.md (optional)">
+    Create a `SKILL.md` file with domain expertise. This will be injected into the agent's context at runtime.
+  </Step>
+  
+  <Step title="Test Locally">
+    ```bash
+    openfang hand install ./my-hand
+    openfang hand activate my-hand
+    ```
+  </Step>
+  
+  <Step title="Publish to FangHub">
+    ```bash
+    openfang hand publish ./my-hand
+    ```
+    
+    Once published, anyone can install your Hand:
+    ```bash
+    openfang hand install fanghub:username/my-hand
+    ```
+  </Step>
+</Steps>
+
+## Dashboard Metrics
+
+Hands define custom metrics that appear in the dashboard:
+
+```toml
+[[dashboard.metrics]]
+label = "Clips Generated"
+memory_key = "clips_count"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Total Video Duration"
+memory_key = "total_video_seconds"
+format = "duration"
+
+[[dashboard.metrics]]
+label = "Storage Used"
+memory_key = "storage_bytes"
+format = "bytes"
+```
+
+**Format types:**
+
+- `number`: Raw integer display
+- `duration`: Formats seconds as "2h 15m"
+- `bytes`: Formats bytes as "1.5 GB"
+- `currency`: Formats as "$12.50"
+- `percent`: Formats 0.85 as "85%"
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build a Hand" icon="hammer" href="/hands/custom">
+    Step-by-step guide to creating your first Hand
+  </Card>
+  
+  <Card title="Hand API Reference" icon="code" href="/hands/overview">
+    Full API documentation for Hand management
+  </Card>
+  
+  <Card title="Security" icon="shield" href="/concepts/security">
+    Understand guardrails and approval gates
+  </Card>
+  
+  <Card title="Agent Lifecycle" icon="circle-nodes" href="/concepts/agents">
+    Learn how Hand agents are spawned and managed
+  </Card>
+</CardGroup>

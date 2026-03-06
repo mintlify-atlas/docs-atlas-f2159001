@@ -1,0 +1,522 @@
+---
+title: Model Context Protocol (MCP)
+description: Connect OpenFang to external MCP servers and expose agents via MCP
+---
+
+The Model Context Protocol (MCP) is a JSON-RPC 2.0 based protocol that standardizes how LLM applications discover and invoke tools. OpenFang supports MCP in both directions:
+
+<CardGroup cols={2}>
+  <Card title="MCP Client" icon="plug">
+    Connect to external MCP servers and use their tools
+  </Card>
+  <Card title="MCP Server" icon="server">
+    Expose OpenFang agents as MCP tools to IDEs
+  </Card>
+</CardGroup>
+
+OpenFang implements MCP protocol version `2024-11-05`.
+
+## MCP Client
+
+The MCP client allows OpenFang to connect to any MCP-compatible server and use its tools as if they were built-in.
+
+### Configuration
+
+MCP servers are configured in `config.toml` using the `[[mcp_servers]]` array:
+
+```toml
+[[mcp_servers]]
+name = "github"
+timeout_secs = 30
+env = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+
+[mcp_servers.transport]
+type = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+```
+
+### Configuration Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `String` | required | Display name, used in tool namespacing |
+| `transport` | `McpTransportEntry` | required | How to connect (stdio or SSE) |
+| `timeout_secs` | `u64` | `30` | JSON-RPC request timeout |
+| `env` | `Vec<String>` | `[]` | Env vars to pass through to subprocess |
+
+### Transport Types
+
+<Accordion title="Stdio Transport">
+  Spawns a subprocess and communicates via stdin/stdout with newline-delimited JSON-RPC:
+  
+  ```toml
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-github"]
+  ```
+  
+  The subprocess environment is cleared and only explicitly whitelisted variables (in `env` field) plus `PATH` are passed through.
+</Accordion>
+
+<Accordion title="SSE Transport">
+  Connects to a remote HTTP endpoint and sends JSON-RPC via POST:
+  
+  ```toml
+  [mcp_servers.transport]
+  type = "sse"
+  url = "https://mcp.example.com/api"
+  ```
+  
+  URLs are validated to prevent SSRF attacks against metadata endpoints.
+</Accordion>
+
+### Tool Namespacing
+
+All tools discovered from MCP servers are namespaced using the pattern `mcp_{server}_{tool}` to prevent collisions:
+
+<CardGroup cols={2}>
+  <Card title="Example 1">
+    Server: `github`  
+    Tool: `create_issue`  
+    Result: `mcp_github_create_issue`
+  </Card>
+  <Card title="Example 2">
+    Server: `my-server`  
+    Tool: `do_thing`  
+    Result: `mcp_my_server_do_thing`
+  </Card>
+</CardGroup>
+
+Helper functions (exported from `openfang_runtime::mcp`):
+- `format_mcp_tool_name(server, tool)` — builds the namespaced name
+- `is_mcp_tool(name)` — checks if a tool name starts with `mcp_`
+- `extract_mcp_server(tool_name)` — extracts the server name from a namespaced tool
+
+### Auto-Connection on Kernel Boot
+
+When the kernel starts, it automatically connects to configured MCP servers:
+
+<Steps>
+  <Step title="Read configuration">
+    Iterates each `McpServerConfigEntry` in the config
+  </Step>
+  
+  <Step title="Establish connection">
+    Spawns subprocess (stdio) or creates HTTP client (SSE)
+  </Step>
+  
+  <Step title="Initialize handshake">
+    Sends `initialize` request with client info, followed by `notifications/initialized`
+  </Step>
+  
+  <Step title="Discover tools">
+    Calls `tools/list` to discover all available tools and namespaces them
+  </Step>
+  
+  <Step title="Cache tools">
+    Stores discovered `ToolDefinition` entries in `kernel.mcp_tools` and live connections in `kernel.mcp_connections`
+  </Step>
+</Steps>
+
+### Connection Lifecycle
+
+The `McpConnection` struct manages the lifetime:
+
+```rust
+pub struct McpConnection {
+    config: McpServerConfig,
+    tools: Vec<ToolDefinition>,
+    transport: McpTransportHandle,  // Stdio or SSE
+    next_id: u64,                   // JSON-RPC request counter
+}
+```
+
+When dropped, stdio subprocesses are automatically killed:
+
+```rust
+impl Drop for McpConnection {
+    fn drop(&mut self) {
+        if let McpTransportHandle::Stdio { ref mut child, .. } = self.transport {
+            let _ = child.start_kill();
+        }
+    }
+}
+```
+
+### Configuration Examples
+
+<Accordion title="GitHub Server">
+  Provides file, issue, and PR tools:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "github"
+  timeout_secs = 30
+  env = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+  
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-github"]
+  ```
+</Accordion>
+
+<Accordion title="Filesystem Server">
+  Provides file read/write tools:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "filesystem"
+  timeout_secs = 10
+  env = []
+  
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
+  ```
+</Accordion>
+
+<Accordion title="PostgreSQL Server">
+  Provides database query tools:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "postgres"
+  timeout_secs = 30
+  env = ["DATABASE_URL"]
+  
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-postgres"]
+  ```
+</Accordion>
+
+<Accordion title="Puppeteer (Browser Automation)">
+  Provides browser automation tools:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "puppeteer"
+  timeout_secs = 60
+  
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-puppeteer"]
+  ```
+</Accordion>
+
+<Accordion title="Remote SSE Server">
+  Connect to remote MCP server:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "remote-tools"
+  timeout_secs = 30
+  
+  [mcp_servers.transport]
+  type = "sse"
+  url = "https://tools.example.com/mcp"
+  ```
+</Accordion>
+
+<Accordion title="Multiple Servers">
+  Configure multiple MCP servers simultaneously:
+  
+  ```toml
+  [[mcp_servers]]
+  name = "github"
+  env = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-github"]
+  
+  [[mcp_servers]]
+  name = "filesystem"
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
+  
+  [[mcp_servers]]
+  name = "postgres"
+  env = ["DATABASE_URL"]
+  [mcp_servers.transport]
+  type = "stdio"
+  command = "npx"
+  args = ["-y", "@modelcontextprotocol/server-postgres"]
+  ```
+</Accordion>
+
+### Tool Discovery and Execution
+
+MCP tools are merged into the agent's available tool set:
+
+```
+built-in tools (23) + skill tools + MCP tools = full tool list
+```
+
+When an agent calls an MCP tool during its loop:
+
+<Steps>
+  <Step title="Recognize prefix">
+    Tool runner recognizes the `mcp_` prefix
+  </Step>
+  
+  <Step title="Find connection">
+    Locates the appropriate `McpConnection` by server name
+  </Step>
+  
+  <Step title="Strip namespace">
+    Removes the `mcp_{server}_` prefix
+  </Step>
+  
+  <Step title="Forward request">
+    Sends `tools/call` request to the external MCP server
+  </Step>
+</Steps>
+
+## MCP Server
+
+OpenFang can act as an MCP server, exposing its agents as callable tools to external MCP clients.
+
+### How It Works
+
+Each OpenFang agent becomes an MCP tool named `openfang_agent_{name}` (with hyphens replaced by underscores). The tool accepts a single `message` string parameter and returns the agent's response.
+
+<Note>
+Example: An agent named `code-reviewer` becomes the MCP tool `openfang_agent_code_reviewer`.
+</Note>
+
+### CLI: openfang mcp
+
+The primary way to run the MCP server:
+
+```bash
+openfang mcp
+```
+
+This command:
+
+<Steps>
+  <Step title="Check for daemon">
+    Looks for a running OpenFang daemon
+  </Step>
+  
+  <Step title="Choose backend">
+    If daemon found, proxies to it via HTTP. Otherwise, boots an in-process kernel.
+  </Step>
+  
+  <Step title="Start stdio server">
+    Reads Content-Length framed JSON-RPC messages from stdin
+  </Step>
+  
+  <Step title="Process requests">
+    Handles MCP requests and writes responses to stdout
+  </Step>
+</Steps>
+
+### HTTP MCP Endpoint
+
+OpenFang also exposes an MCP endpoint over HTTP at `POST /mcp`.
+
+<Note>
+Unlike the stdio server (which only exposes agents), the HTTP endpoint exposes the **full tool set**: built-in tools, skills, and MCP tools. This means the HTTP MCP endpoint supports all 23 built-in tools plus installed skill tools and connected MCP server tools.
+</Note>
+
+### Supported JSON-RPC Methods
+
+| Method | Description |
+|--------|-------------|
+| `initialize` | Handshake; returns server capabilities and info |
+| `notifications/initialized` | Client confirmation; no response |
+| `tools/list` | Returns all available tools with names, descriptions, and input schemas |
+| `tools/call` | Executes a tool and returns the result |
+
+Unknown methods receive a `-32601` (Method not found) error.
+
+### Protocol Details
+
+#### Message Framing (stdio mode)
+
+```
+Content-Length: 123\r\n
+\r\n
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+```
+
+Messages are limited to 10 MB. Oversized messages are drained and rejected.
+
+#### Initialize Handshake
+
+Request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "cursor", "version": "1.0" }
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": { "tools": {} },
+    "serverInfo": { "name": "openfang", "version": "0.1.0" }
+  }
+}
+```
+
+#### Tool Call
+
+Request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "openfang_agent_code_reviewer",
+    "arguments": {
+      "message": "Review this Python function for security issues..."
+    }
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [{
+      "type": "text",
+      "text": "I found 3 potential security issues..."
+    }]
+  }
+}
+```
+
+### Connecting from IDEs
+
+<Accordion title="Cursor / VS Code">
+  Add to your MCP configuration file (`.cursor/mcp.json` or VS Code MCP settings):
+  
+  ```json
+  {
+    "mcpServers": {
+      "openfang": {
+        "command": "openfang",
+        "args": ["mcp"]
+      }
+    }
+  }
+  ```
+</Accordion>
+
+<Accordion title="Claude Desktop">
+  Add to `claude_desktop_config.json`:
+  
+  ```json
+  {
+    "mcpServers": {
+      "openfang": {
+        "command": "openfang",
+        "args": ["mcp"],
+        "env": {}
+      }
+    }
+  }
+  ```
+</Accordion>
+
+After configuration, all OpenFang agents appear as tools in the IDE.
+
+## MCP API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/mcp/servers` | List configured and connected MCP servers with their tools |
+| `POST` | `/mcp` | Handle MCP JSON-RPC requests over HTTP (full tool execution) |
+
+### GET /api/mcp/servers
+
+Response:
+
+```json
+{
+  "configured": [
+    {
+      "name": "github",
+      "transport": { "type": "stdio", "command": "npx", "args": [...] },
+      "timeout_secs": 30,
+      "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+    }
+  ],
+  "connected": [
+    {
+      "name": "github",
+      "tools_count": 12,
+      "tools": [
+        { "name": "mcp_github_create_issue", "description": "[MCP:github] Create a GitHub issue" },
+        { "name": "mcp_github_search_repos", "description": "[MCP:github] Search repositories" }
+      ],
+      "connected": true
+    }
+  ]
+}
+```
+
+## Security
+
+<CardGroup cols={2}>
+  <Card title="Subprocess Sandboxing" icon="box">
+    Stdio MCP servers run with `env_clear()` — environment is completely cleared. Only whitelisted env vars plus `PATH` are passed through.
+  </Card>
+  
+  <Card title="Path Traversal Prevention" icon="shield">
+    Command paths are validated to reject `..` sequences.
+  </Card>
+  
+  <Card title="SSRF Protection" icon="shield-halved">
+    SSE transport URLs are checked against metadata endpoints (169.254.169.254, metadata.google).
+  </Card>
+  
+  <Card title="Request Timeout" icon="clock">
+    All MCP requests have configurable timeout (default 30 seconds).
+  </Card>
+  
+  <Card title="Message Size Limit" icon="file-zipper">
+    Stdio MCP server enforces 10 MB maximum message size.
+  </Card>
+  
+  <Card title="Kernel-Level Protection" icon="lock">
+    MCP tool execution flows through the same security pipeline: capability-based access control, tool result truncation (50K cap), 60-second timeout, loop guard detection, and taint tracking.
+  </Card>
+</CardGroup>
+
+## Source Files
+
+- Client: `crates/openfang-runtime/src/mcp.rs`
+- Server handler: `crates/openfang-runtime/src/mcp_server.rs`
+- CLI server: `crates/openfang-cli/src/mcp.rs`
+- Config types: `crates/openfang-types/src/config.rs`

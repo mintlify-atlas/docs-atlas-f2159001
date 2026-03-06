@@ -1,0 +1,173 @@
+---
+title: 'Hands Overview'
+description: 'Autonomous agents that work 24/7 on specialized tasks'
+icon: 'hand'
+---
+
+## What Are Hands?
+
+Hands are specialized autonomous agents in OpenFang designed to run continuously and handle specific workflows. Unlike general-purpose chat agents, Hands are optimized for:
+
+- **Continuous operation** — Run scheduled tasks 24/7
+- **Domain expertise** — Deep knowledge in specific areas (video editing, research, social media)
+- **Multi-phase pipelines** — Complex workflows broken into manageable steps
+- **State persistence** — Remember progress across sessions
+- **Tool specialization** — Access to specialized tools for their domain
+
+## Available Hands
+
+<CardGroup cols={2}>
+  <Card title="Clip Hand" icon="film" href="/hands/clip">
+    Turn long videos into viral short clips with captions and thumbnails
+  </Card>
+  
+  <Card title="Lead Hand" icon="chart-line" href="/hands/lead">
+    Discover and enrich qualified leads on autopilot
+  </Card>
+  
+  <Card title="Collector Hand" icon="magnifying-glass" href="/hands/collector">
+    Monitor any target with continuous intelligence collection
+  </Card>
+  
+  <Card title="Predictor Hand" icon="crystal-ball" href="/hands/predictor">
+    Make calibrated predictions and track accuracy over time
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Conduct exhaustive investigations with fact-checking
+  </Card>
+  
+  <Card title="Twitter Hand" icon="twitter" href="/hands/twitter">
+    Autonomous Twitter content creation and engagement
+  </Card>
+  
+  <Card title="Browser Hand" icon="browser" href="/hands/browser">
+    Navigate websites and complete multi-step web tasks
+  </Card>
+  
+  <Card title="Custom Hand" icon="code" href="/hands/custom">
+    Build your own specialized Hand
+  </Card>
+</CardGroup>
+
+## How Hands Work
+
+### Activation
+
+Hands are activated by loading their definition file:
+
+```bash
+openfang hand activate clip
+```
+
+This creates an agent instance with the Hand's specialized configuration, tools, and system prompt.
+
+### Configuration
+
+Each Hand has settings that control its behavior:
+
+```toml
+# Example from Clip Hand
+[settings]
+stt_provider = "groq_whisper"  # Speech-to-text provider
+publish_target = "telegram"     # Where to send clips
+```
+
+Settings can be configured through:
+- The web dashboard at `http://localhost:4200`
+- Direct TOML editing in `~/.openfang/hands/`
+- CLI configuration commands
+
+### Requirements
+
+Some Hands require external tools or API keys:
+
+<Warning>
+Check the requirements section for each Hand before activating. Missing dependencies will prevent the Hand from functioning.
+</Warning>
+
+### Scheduling
+
+Hands can run on schedules:
+
+```javascript
+// Created automatically by the Hand's initialization
+schedule_create({
+  frequency: "daily",
+  time: "09:00",
+  task: "generate_lead_report"
+})
+```
+
+### Memory & State
+
+Hands persist state between runs:
+
+- **Memory store** — Key-value storage for metrics and state
+- **Knowledge graph** — Entity and relationship tracking
+- **File storage** — Reports, databases, and artifacts
+
+## Hand Architecture
+
+Every Hand follows a consistent multi-phase pipeline:
+
+<Steps>
+  <Step title="Phase 0: Platform Detection">
+    Detect OS and load state from previous runs
+  </Step>
+  
+  <Step title="Phase 1: Initialization">
+    Set up schedules, load configuration, build strategy
+  </Step>
+  
+  <Step title="Phase 2-5: Core Work">
+    Execute the Hand's specialized workflow (varies by Hand)
+  </Step>
+  
+  <Step title="Final Phase: Persistence">
+    Save state, update metrics, generate reports
+  </Step>
+</Steps>
+
+## Dashboard Metrics
+
+All Hands expose metrics through the dashboard:
+
+- **Jobs completed** — Total tasks finished
+- **Items processed** — Clips generated, leads found, etc.
+- **Performance data** — Success rates, quality metrics
+- **Last run** — When the Hand last executed
+
+## Safety Guardrails
+
+Hands include built-in safety features:
+
+- **Rate limiting** — Respect API and service limits
+- **Approval modes** — Require user confirmation for sensitive actions
+- **Error recovery** — Graceful handling of failures
+- **Cross-platform compatibility** — Works on Windows, macOS, Linux
+
+## Choosing the Right Hand
+
+| Use Case | Hand | Why |
+|----------|------|-----|
+| Create social media content from videos | Clip Hand | Automated video processing pipeline |
+| Generate sales leads | Lead Hand | Continuous discovery and enrichment |
+| Track competitors or markets | Collector Hand | Change detection and knowledge graphs |
+| Forecast trends | Predictor Hand | Calibrated predictions with accuracy tracking |
+| Deep dive research | Researcher Hand | Multi-source verification and synthesis |
+| Manage Twitter presence | Twitter Hand | Content generation and engagement |
+| Automate web tasks | Browser Hand | Real browser automation with safety |
+| Custom workflow | Custom Hand | Build your own specialized agent |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore Hands" icon="compass" href="/hands/clip">
+    Browse the documentation for each Hand
+  </Card>
+  
+  <Card title="Build Your Own" icon="hammer" href="/hands/custom">
+    Learn how to create custom Hands
+  </Card>
+</CardGroup>

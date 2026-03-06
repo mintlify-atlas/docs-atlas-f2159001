@@ -1,0 +1,207 @@
+---
+title: Introduction
+description: OpenFang is an open-source Agent Operating System built in Rust — not a chatbot framework, not a Python wrapper around an LLM, not a "multi-agent orchestrator." It is a full operating system for autonomous agents.
+---
+
+<img
+  className="block"
+  src="https://raw.githubusercontent.com/RightNow-AI/openfang/main/public/assets/openfang-logo.png"
+  alt="OpenFang Logo"
+  width="160"
+/>
+
+# The Agent Operating System
+
+OpenFang is an **open-source Agent Operating System** — not a chatbot framework, not a Python wrapper around an LLM, not a "multi-agent orchestrator." It is a full operating system for autonomous agents, built from scratch in Rust.
+
+Traditional agent frameworks wait for you to type something. OpenFang runs **autonomous agents that work for you** — on schedules, 24/7, building knowledge graphs, monitoring targets, generating leads, managing your social media, and reporting results to your dashboard.
+
+The entire system compiles to a **single ~32MB binary**. One install, one command, your agents are live.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in 5 minutes
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how OpenFang works
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the full REST API
+  </Card>
+  <Card title="Autonomous Hands" icon="hand" href="/hands/overview">
+    Pre-built capability packages
+  </Card>
+</CardGroup>
+
+## Installation
+
+<CodeGroup>
+
+```bash macOS/Linux
+curl -fsSL https://openfang.sh/install | sh
+openfang init
+openfang start
+```
+
+```powershell Windows
+irm https://openfang.sh/install.ps1 | iex
+openfang init
+openfang start
+```
+
+</CodeGroup>
+
+Dashboard live at `http://localhost:4200`
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Autonomous Hands" icon="hand">
+    7 pre-built capability packages that run independently on schedules — Clip, Lead, Collector, Predictor, Researcher, Twitter, Browser
+  </Card>
+  <Card title="16-Layer Security" icon="shield">
+    WASM sandbox, Merkle audit trail, SSRF protection, capability-based access control, and 12 more security systems
+  </Card>
+  <Card title="40 Channel Adapters" icon="messages">
+    Connect agents to Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Email, and 33 more platforms
+  </Card>
+  <Card title="27 LLM Providers" icon="brain">
+    123+ models with intelligent routing — Anthropic, OpenAI, Gemini, DeepSeek, Groq, Ollama, and more
+  </Card>
+  <Card title="MCP & A2A Support" icon="plug">
+    Model Context Protocol client/server and Agent-to-Agent protocol for inter-system communication
+  </Card>
+  <Card title="Single Binary" icon="cube">
+    ~32MB binary with zero dependencies — builds in Rust, runs anywhere
+  </Card>
+</CardGroup>
+
+## Performance Benchmarks
+
+<Note>
+All data from official documentation and public repositories — February 2026.
+</Note>
+
+### Cold Start Time
+
+- **OpenFang**: 180 ms ⭐
+- ZeroClaw: 10 ms
+- LangGraph: 2.5 sec
+- CrewAI: 3.0 sec
+- AutoGen: 4.0 sec
+- OpenClaw: 5.98 sec
+
+### Idle Memory Usage
+
+- **OpenFang**: 40 MB ⭐
+- ZeroClaw: 5 MB
+- LangGraph: 180 MB
+- CrewAI: 200 MB
+- AutoGen: 250 MB
+- OpenClaw: 394 MB
+
+### Install Size
+
+- **OpenFang**: 32 MB ⭐
+- ZeroClaw: 8.8 MB
+- CrewAI: 100 MB
+- LangGraph: 150 MB
+- AutoGen: 200 MB
+- OpenClaw: 500 MB
+
+## Architecture Overview
+
+OpenFang is organized as a Cargo workspace with 14 crates:
+
+```
+openfang-cli            CLI interface, daemon auto-detect, MCP server
+openfang-desktop        Tauri 2.0 desktop app (WebView + system tray)
+openfang-api            REST/WS/SSE API server (Axum), 140+ endpoints
+openfang-kernel         Kernel: assembles all subsystems, workflow engine, RBAC
+openfang-runtime        Agent loop, 3 LLM drivers, 53 tools, WASM sandbox
+openfang-channels       40 channel adapters, bridge, formatter
+openfang-wire           OFP peer-to-peer networking with HMAC-SHA256 auth
+openfang-memory         SQLite memory substrate, sessions, semantic search
+openfang-skills         60 bundled skills, FangHub marketplace
+openfang-hands          7 autonomous Hands, HAND.toml parser
+openfang-extensions     25 MCP templates, AES-256-GCM credential vault
+openfang-migrate        Migration engine (OpenClaw, LangChain, AutoGPT)
+openfang-types          Core types, taint tracking, manifest signing
+xtask                   Build automation
+```
+
+## What Makes OpenFang Different?
+
+### Autonomous Hands
+
+**Hands** are OpenFang's core innovation — pre-built autonomous capability packages that run independently, on schedules, without you having to prompt them.
+
+Each Hand bundles:
+- **HAND.toml** — Manifest declaring tools, settings, requirements, and dashboard metrics
+- **System Prompt** — Multi-phase operational playbook (500+ word expert procedures)
+- **SKILL.md** — Domain expertise reference injected into context at runtime
+- **Guardrails** — Approval gates for sensitive actions
+
+All compiled into the binary. No downloading, no pip install, no Docker pull.
+
+### 16 Security Systems
+
+OpenFang doesn't bolt security on after the fact. Every layer is independently testable and operates without a single point of failure:
+
+1. **WASM Dual-Metered Sandbox** — Tool code runs in WebAssembly with fuel metering + epoch interruption
+2. **Merkle Hash-Chain Audit Trail** — Every action is cryptographically linked to the previous one
+3. **Information Flow Taint Tracking** — Labels propagate through execution
+4. **Ed25519 Signed Agent Manifests** — Every agent identity is cryptographically signed
+5. **SSRF Protection** — Blocks private IPs, cloud metadata endpoints, DNS rebinding
+6. **Secret Zeroization** — API keys auto-wipe from memory
+7. **OFP Mutual Authentication** — HMAC-SHA256 nonce-based auth
+8. **Capability Gates** — Role-based access control
+9. **Security Headers** — CSP, X-Frame-Options, HSTS on every response
+10. **Health Endpoint Redaction** — Full diagnostics require authentication
+11. **Subprocess Sandbox** — `env_clear()` + selective variable passthrough
+12. **Prompt Injection Scanner** — Detects override attempts in skills
+13. **Loop Guard** — SHA256-based tool call loop detection
+14. **Session Repair** — 7-phase message history validation
+15. **Path Traversal Prevention** — Canonicalization with symlink escape prevention
+16. **GCRA Rate Limiter** — Cost-aware token bucket rate limiting
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="GitHub" icon="github" href="https://github.com/RightNow-AI/openfang">
+    Star the repository
+  </Card>
+  <Card title="Discord" icon="discord" href="https://discord.gg/sSJqgNnq6X">
+    Join the community
+  </Card>
+  <Card title="Twitter/X" icon="twitter" href="https://x.com/openfangg">
+    Follow updates
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Install OpenFang and spawn your first agent
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/architecture">
+    Learn how the system works
+  </Card>
+  <Card title="Autonomous Hands" icon="hand" href="/hands/overview">
+    Explore the 7 built-in Hands
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure models, channels, and security
+  </Card>
+</CardGroup>
+
+## License
+
+OpenFang is open source under the Apache 2.0 and MIT licenses. Use it however you want.
+
+<Note>
+**v0.1.0 — First Release (February 2026)**
+
+OpenFang is feature-complete but this is the first public release. You may encounter instability, rough edges, or breaking changes between minor versions. Pin to a specific commit for production use until v1.0.
+</Note>

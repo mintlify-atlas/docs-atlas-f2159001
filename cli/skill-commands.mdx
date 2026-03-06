@@ -1,0 +1,590 @@
+---
+title: Skill Commands
+description: Install and manage agent skills from the command line
+---
+
+# Skill Commands
+
+Skills extend agent capabilities with specialized tools and knowledge. All skill commands are under the `openfang skill` namespace.
+
+## Listing Skills
+
+### openfang skill list
+
+List all installed skills.
+
+```bash
+openfang skill list
+```
+
+**Example Output:**
+
+```bash
+$ openfang skill list
+
+  Installed Skills
+
+  NAME              VERSION   TOOLS   DESCRIPTION
+  web-search        1.2.0     3       Web search and content extraction
+  code-reviewer     2.0.1     5       Automated code review and analysis
+  git-expert        1.5.0     8       Git operations and workflow management
+  docker            1.0.0     12      Docker container management
+  kubernetes        1.3.0     15      Kubernetes cluster operations
+  data-analyst      1.1.0     7       Data analysis and visualization
+  sql-expert        1.0.0     6       SQL query generation and optimization
+  api-tester        1.0.0     4       REST API testing and validation
+
+  Total: 8 skills
+  Source: ~/.openfang/skills/ + bundled
+```
+
+**Output Columns:**
+
+- **NAME** - Skill identifier (use this with `skill remove`)
+- **VERSION** - Semantic version
+- **TOOLS** - Number of tools provided by the skill
+- **DESCRIPTION** - Human-readable description
+
+<Note>
+  Skills are loaded from `~/.openfang/skills/` plus bundled skills compiled into the binary.
+</Note>
+
+## Installing Skills
+
+### openfang skill install
+
+Install a skill from a local directory, git URL, or FangHub marketplace.
+
+```bash
+openfang skill install <SOURCE>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<SOURCE>` | Skill name (FangHub), local directory path, or git URL |
+
+### Install from FangHub
+
+FangHub is the OpenFang skill marketplace with curated, verified skills:
+
+```bash
+$ openfang skill install web-search
+
+  Installing from FangHub...
+
+  [ok] Downloaded: web-search v1.2.0
+  [ok] Verified: SHA256 checksum
+  [ok] Scanned: No prompt injection detected
+  [ok] Installed: ~/.openfang/skills/web-search/
+
+  Skill ready. Restart agents to use: openfang stop && openfang start
+```
+
+<Note>
+  Skills from FangHub pass through SHA256 verification and prompt injection scanning.
+</Note>
+
+### Install from Local Directory
+
+```bash
+$ openfang skill install ./my-skill/
+
+  Installing from local directory...
+
+  [ok] Found skill.toml
+  [ok] Validated manifest
+  [ok] Copied to: ~/.openfang/skills/my-skill/
+
+  Skill ready. Restart agents to use: openfang stop && openfang start
+```
+
+**Local Directory Structure:**
+
+```
+my-skill/
+  skill.toml        # Required: skill manifest
+  src/
+    main.py         # Entry point (Python)
+    # or index.js   # Entry point (Node.js)
+  requirements.txt  # Python dependencies (optional)
+  package.json      # Node.js dependencies (optional)
+  README.md         # Documentation (optional)
+```
+
+### Install from Git URL
+
+```bash
+openfang skill install https://github.com/user/my-skill.git
+```
+
+### OpenClaw Compatibility
+
+OpenFang can auto-convert OpenClaw-format skills:
+
+```bash
+$ openfang skill install ./openclaw-skill/
+
+  [ok] Detected OpenClaw format (SKILL.md)
+  [ok] Converted to OpenFang format
+  [ok] Installed: ~/.openfang/skills/openclaw-skill/
+```
+
+**OpenClaw Format:**
+
+```
+openclaw-skill/
+  SKILL.md          # Skill definition with YAML frontmatter
+```
+
+<Warning>
+  After installing skills, restart the daemon for changes to take effect: `openfang stop && openfang start`
+</Warning>
+
+## Searching Skills
+
+### openfang skill search
+
+Search the FangHub marketplace for skills.
+
+```bash
+openfang skill search <QUERY>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<QUERY>` | Search query string |
+
+**Example:**
+
+```bash
+$ openfang skill search "docker kubernetes"
+
+  FangHub Search Results
+
+  NAME              VERSION   DOWNLOADS   DESCRIPTION
+  docker            1.0.0     15.2k       Docker container management
+  kubernetes        1.3.0     12.8k       Kubernetes cluster operations
+  helm              1.0.0     8.5k        Helm chart management
+  docker-compose    1.1.0     7.2k        Docker Compose orchestration
+
+  Install with: openfang skill install <name>
+```
+
+**Search Tips:**
+
+- Use multiple keywords to refine results
+- Search by category: `openfang skill search cloud`
+- Search by language: `openfang skill search python`
+- Search by use case: `openfang skill search api testing`
+
+## Creating Skills
+
+### openfang skill create
+
+Interactively scaffold a new skill project.
+
+```bash
+openfang skill create
+```
+
+**Interactive Prompts:**
+
+```bash
+$ openfang skill create
+
+  Skill name: my-analysis-tool
+  Description: A custom tool for data analysis
+  Runtime (python/node/wasm) [python]: python
+
+  [ok] Created: ~/.openfang/skills/my-analysis-tool/
+
+  Files created:
+    skill.toml
+    src/main.py
+    requirements.txt
+    README.md
+
+  Next steps:
+    1. Edit src/main.py to implement your tool
+    2. Add dependencies to requirements.txt
+    3. Test: python src/main.py
+    4. Install: openfang skill install ~/.openfang/skills/my-analysis-tool/
+```
+
+**Generated skill.toml:**
+
+```toml
+name = "my-analysis-tool"
+version = "0.1.0"
+description = "A custom tool for data analysis"
+runtime = "python"
+entry_point = "src/main.py"
+
+[[tools]]
+name = "analyze"
+description = "Analyze data and return insights"
+parameters = [
+  { name = "data", type = "string", description = "Data to analyze" }
+]
+```
+
+**Generated src/main.py:**
+
+```python
+#!/usr/bin/env python3
+"""my-analysis-tool - A custom tool for data analysis"""
+
+import json
+import sys
+
+def analyze(data: str) -> dict:
+    """
+    Analyze data and return insights.
+    
+    Args:
+        data: Data to analyze
+        
+    Returns:
+        Analysis results
+    """
+    # TODO: Implement your analysis logic here
+    return {
+        "status": "success",
+        "insights": ["Insight 1", "Insight 2"]
+    }
+
+if __name__ == "__main__":
+    # Read tool call from stdin (JSON)
+    input_data = json.load(sys.stdin)
+    tool_name = input_data.get("tool")
+    params = input_data.get("params", {})
+    
+    if tool_name == "analyze":
+        result = analyze(params.get("data", ""))
+        print(json.dumps(result))
+    else:
+        print(json.dumps({"error": f"Unknown tool: {tool_name}"}))
+```
+
+## Removing Skills
+
+### openfang skill remove
+
+Remove an installed skill.
+
+```bash
+openfang skill remove <NAME>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<NAME>` | Name of the skill to remove |
+
+**Example:**
+
+```bash
+$ openfang skill remove web-search
+
+  [?] Remove skill 'web-search'? This cannot be undone. (y/n): y
+  [ok] Removed: web-search
+
+  Restart agents to apply changes: openfang stop && openfang start
+```
+
+<Warning>
+  Removing a skill deletes it from `~/.openfang/skills/`. This action cannot be undone. Bundled skills cannot be removed.
+</Warning>
+
+## Skill Development
+
+### Skill Manifest (skill.toml)
+
+Every skill requires a `skill.toml` manifest:
+
+```toml
+name = "my-skill"
+version = "1.0.0"
+description = "Short description"
+runtime = "python"  # or "node", "wasm"
+entry_point = "src/main.py"
+
+# Optional: dependencies
+[dependencies]
+python = ">=3.9"
+packages = ["requests", "beautifulsoup4"]
+
+# Tool definitions
+[[tools]]
+name = "fetch"
+description = "Fetch data from a URL"
+parameters = [
+  { name = "url", type = "string", description = "URL to fetch" },
+  { name = "timeout", type = "integer", description = "Timeout in seconds", default = 30 }
+]
+
+[[tools]]
+name = "parse"
+description = "Parse HTML content"
+parameters = [
+  { name = "html", type = "string", description = "HTML to parse" },
+  { name = "selector", type = "string", description = "CSS selector" }
+]
+```
+
+### Tool Implementation (Python)
+
+```python
+#!/usr/bin/env python3
+import json
+import sys
+import requests
+from bs4 import BeautifulSoup
+
+def fetch(url: str, timeout: int = 30) -> dict:
+    """Fetch data from a URL."""
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        return {"status": "success", "content": response.text}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def parse(html: str, selector: str) -> dict:
+    """Parse HTML content."""
+    soup = BeautifulSoup(html, 'html.parser')
+    elements = soup.select(selector)
+    return {
+        "status": "success",
+        "matches": [el.get_text() for el in elements]
+    }
+
+if __name__ == "__main__":
+    # Read tool call from stdin
+    input_data = json.load(sys.stdin)
+    tool_name = input_data.get("tool")
+    params = input_data.get("params", {})
+    
+    # Dispatch to the appropriate tool
+    if tool_name == "fetch":
+        result = fetch(**params)
+    elif tool_name == "parse":
+        result = parse(**params)
+    else:
+        result = {"error": f"Unknown tool: {tool_name}"}
+    
+    print(json.dumps(result))
+```
+
+### Tool Implementation (Node.js)
+
+```javascript
+#!/usr/bin/env node
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+async function fetch(url, timeout = 30000) {
+  try {
+    const response = await axios.get(url, { timeout });
+    return { status: 'success', content: response.data };
+  } catch (error) {
+    return { status: 'error', message: error.message };
+  }
+}
+
+function parse(html, selector) {
+  const $ = cheerio.load(html);
+  const matches = $(selector).map((i, el) => $(el).text()).get();
+  return { status: 'success', matches };
+}
+
+// Read tool call from stdin
+let inputData = '';
+process.stdin.on('data', chunk => inputData += chunk);
+process.stdin.on('end', () => {
+  const { tool, params } = JSON.parse(inputData);
+  
+  let result;
+  if (tool === 'fetch') {
+    fetch(params.url, params.timeout).then(res => {
+      console.log(JSON.stringify(res));
+    });
+  } else if (tool === 'parse') {
+    result = parse(params.html, params.selector);
+    console.log(JSON.stringify(result));
+  } else {
+    console.log(JSON.stringify({ error: `Unknown tool: ${tool}` }));
+  }
+});
+```
+
+### Testing Skills Locally
+
+Test your skill before installing:
+
+```bash
+# Test tool call with sample input
+echo '{"tool":"fetch","params":{"url":"https://example.com"}}' | python src/main.py
+
+# Expected output
+{"status":"success","content":"<!DOCTYPE html>..."}
+```
+
+## Bundled Skills
+
+OpenFang includes 60+ bundled skills compiled into the binary:
+
+### Development Skills
+
+- `code-reviewer` - Code review and analysis
+- `git-expert` - Git operations
+- `docker` - Docker management
+- `kubernetes` - Kubernetes operations
+- `ci-cd` - CI/CD pipeline tools
+- `terraform` - Infrastructure as code
+
+### Language Experts
+
+- `python-expert` - Python development
+- `rust-expert` - Rust development
+- `typescript-expert` - TypeScript development
+- `golang-expert` - Go development
+
+### Cloud & Infrastructure
+
+- `aws` - AWS cloud operations
+- `gcp` - Google Cloud operations
+- `azure` - Azure cloud operations
+- `ansible` - Configuration management
+- `nginx` - Web server configuration
+
+### Data & Databases
+
+- `sql-analyst` - SQL query generation
+- `postgres-expert` - PostgreSQL management
+- `mongodb` - MongoDB operations
+- `redis-expert` - Redis operations
+- `data-analyst` - Data analysis
+
+### Web & APIs
+
+- `web-search` - Web search and scraping
+- `api-tester` - REST API testing
+- `openapi-expert` - OpenAPI/Swagger
+- `graphql-expert` - GraphQL development
+
+### Collaboration
+
+- `github` - GitHub integration
+- `jira` - JIRA ticket management
+- `slack-tools` - Slack integration
+- `notion` - Notion workspace
+- `confluence` - Confluence docs
+
+### Security
+
+- `security-audit` - Security scanning
+- `crypto-expert` - Cryptography
+- `compliance` - Compliance checks
+
+View all bundled skills:
+
+```bash
+openfang skill list | grep bundled
+```
+
+## Skill Best Practices
+
+### 1. Single Responsibility
+
+Each tool should do one thing well:
+
+✓ **Good:** Separate tools for fetch and parse
+
+```toml
+[[tools]]
+name = "fetch"
+
+[[tools]]
+name = "parse"
+```
+
+❌ **Bad:** Single tool that does everything
+
+```toml
+[[tools]]
+name = "fetch_and_parse_and_analyze"
+```
+
+### 2. Clear Parameter Types
+
+Use precise parameter definitions:
+
+```toml
+[[tools]]
+name = "analyze"
+parameters = [
+  { name = "data", type = "string", description = "JSON data to analyze" },
+  { name = "threshold", type = "float", description = "Confidence threshold (0.0-1.0)", default = 0.8 },
+  { name = "verbose", type = "boolean", description = "Enable verbose output", default = false }
+]
+```
+
+### 3. Error Handling
+
+Always return structured errors:
+
+```python
+try:
+    result = perform_operation()
+    return {"status": "success", "data": result}
+except ValueError as e:
+    return {"status": "error", "type": "ValueError", "message": str(e)}
+except Exception as e:
+    return {"status": "error", "type": "UnexpectedError", "message": str(e)}
+```
+
+### 4. Documentation
+
+Include comprehensive README.md:
+
+```markdown
+# My Skill
+
+Description of what this skill does.
+
+## Tools
+
+### fetch
+Fetch data from a URL.
+
+**Parameters:**
+- `url` (string): URL to fetch
+- `timeout` (integer): Timeout in seconds (default: 30)
+
+**Returns:**
+```json
+{"status": "success", "content": "..."}
+```
+
+## Installation
+```bash
+openfang skill install my-skill
+```
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Channel Commands" icon="comments" href="/cli/channel-commands">
+    Configure messaging and communication channels
+  </Card>
+  <Card title="Skill Development Guide" icon="code" href="/guides/skill-development">
+    Learn how to build custom skills
+  </Card>
+</CardGroup>

@@ -1,0 +1,472 @@
+---
+title: Agent-to-Agent Protocol (A2A)
+description: Enable cross-framework agent interoperability with the A2A protocol
+---
+
+The Agent-to-Agent (A2A) protocol, originally specified by Google, enables cross-framework agent interoperability. It allows agents built with different frameworks to discover each other's capabilities and exchange tasks.
+
+<CardGroup cols={2}>
+  <Card title="A2A Server" icon="server">
+    Publish Agent Cards and accept task submissions
+  </Card>
+  <Card title="A2A Client" icon="paper-plane">
+    Discover external agents and send tasks to them
+  </Card>
+</CardGroup>
+
+OpenFang implements A2A in both directions, enabling seamless integration with other agent frameworks.
+
+## Agent Card
+
+An Agent Card is a JSON document that describes an agent's identity, capabilities, and supported interaction modes. It is served at the well-known path `/.well-known/agent.json` per the A2A specification.
+
+### Agent Card Structure
+
+```rust
+pub struct AgentCard {
+    pub name: String,
+    pub description: String,
+    pub url: String,                         // endpoint URL
+    pub version: String,                     // protocol version
+    pub capabilities: AgentCapabilities,
+    pub skills: Vec<AgentSkill>,             // A2A skill descriptors
+    pub default_input_modes: Vec<String>,    // e.g., ["text"]
+    pub default_output_modes: Vec<String>,   // e.g., ["text"]
+}
+```
+
+### Agent Capabilities
+
+```rust
+pub struct AgentCapabilities {
+    pub streaming: bool,                 // true — OpenFang supports streaming
+    pub push_notifications: bool,        // false — not currently implemented
+    pub state_transition_history: bool,  // true — task status history available
+}
+```
+
+### Agent Skills
+
+<Note>
+A2A skills are capability descriptors, not the same as OpenFang skills. These describe what the agent can do for cross-framework discovery.
+</Note>
+
+```rust
+pub struct AgentSkill {
+    pub id: String,           // matches the OpenFang tool name
+    pub name: String,         // human-readable
+    pub description: String,
+    pub tags: Vec<String>,
+    pub examples: Vec<String>,
+}
+```
+
+### Example Agent Card
+
+```json
+{
+  "name": "code-reviewer",
+  "description": "Reviews code for bugs, security issues, and style",
+  "url": "http://127.0.0.1:50051/a2a",
+  "version": "0.1.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "skills": [
+    {
+      "id": "file_read",
+      "name": "file read",
+      "description": "Can use the file_read tool",
+      "tags": ["tool"],
+      "examples": []
+    }
+  ],
+  "defaultInputModes": ["text"],
+  "defaultOutputModes": ["text"]
+}
+```
+
+Agent Cards are built from OpenFang agent manifests via `build_agent_card()`. Each tool in the agent's capability list becomes an A2A skill descriptor.
+
+## A2A Server
+
+OpenFang serves A2A requests through the REST API:
+
+<CardGroup cols={3}>
+  <Card title="Agent Card" icon="address-card">
+    Publication at `/.well-known/agent.json`
+  </Card>
+  <Card title="Agent Listing" icon="list">
+    All agents at `/a2a/agents`
+  </Card>
+  <Card title="Task Tracking" icon="tasks">
+    Via `A2aTaskStore`
+  </Card>
+</CardGroup>
+
+### A2aTaskStore
+
+The `A2aTaskStore` is an in-memory, bounded store for tracking A2A task lifecycle:
+
+```rust
+pub struct A2aTaskStore {
+    tasks: Mutex<HashMap<String, A2aTask>>,
+    max_tasks: usize,  // default: 1000
+}
+```
+
+#### Key Properties
+
+- **Bounded**: When reaching `max_tasks`, evicts oldest completed/failed/cancelled task (FIFO)
+- **Thread-safe**: Uses `Mutex<HashMap>` for concurrent access
+- **Kernel field**: Stored as `kernel.a2a_task_store`
+
+#### Methods
+
+<Accordion title="insert(task)">
+  Add a new task, evicting old ones if at capacity
+</Accordion>
+
+<Accordion title="get(task_id)">
+  Retrieve a task by ID
+</Accordion>
+
+<Accordion title="update_status(task_id, status)">
+  Change a task's status
+</Accordion>
+
+<Accordion title="complete(task_id, response, artifacts)">
+  Mark as completed with response
+</Accordion>
+
+<Accordion title="fail(task_id, error_message)">
+  Mark as failed with error
+</Accordion>
+
+<Accordion title="cancel(task_id)">
+  Mark as cancelled
+</Accordion>
+
+### Task Submission Flow
+
+When `POST /a2a/tasks/send` is called:
+
+<Steps>
+  <Step title="Extract message">
+    Extract the message text from A2A request format (parts with type "text")
+  </Step>
+  
+  <Step title="Find target agent">
+    Locate the target agent (currently uses first registered agent)
+  </Step>
+  
+  <Step title="Create task">
+    Create an `A2aTask` with status `Working` and insert into task store
+  </Step>
+  
+  <Step title="Send to agent">
+    Send message to agent via `kernel.send_message()`
+  </Step>
+  
+  <Step title="Handle response">
+    On success: complete task with agent's response  
+    On failure: fail task with error message
+  </Step>
+  
+  <Step title="Return state">
+    Return the final task state
+  </Step>
+</Steps>
+
+## A2A Client
+
+The `A2aClient` struct discovers and interacts with external A2A agents:
+
+```rust
+pub struct A2aClient {
+    client: reqwest::Client,  // 30-second timeout
+}
+```
+
+### Methods
+
+<CardGroup cols={3}>
+  <Card title="discover(url)" icon="magnifying-glass">
+    Fetches `{url}/.well-known/agent.json` and parses the Agent Card
+  </Card>
+  <Card title="send_task(...)" icon="paper-plane">
+    Sends a JSON-RPC task submission
+  </Card>
+  <Card title="get_task(...)" icon="circle-question">
+    Polls for task status
+  </Card>
+</CardGroup>
+
+### Auto-Discovery at Boot
+
+When the kernel starts and A2A is enabled with external agents configured:
+
+<Steps>
+  <Step title="Create client">
+    Creates an `A2aClient`
+  </Step>
+  
+  <Step title="Iterate agents">
+    Iterates each configured `ExternalAgent`
+  </Step>
+  
+  <Step title="Fetch cards">
+    Fetches each agent's card from `{url}/.well-known/agent.json`
+  </Step>
+  
+  <Step title="Log discoveries">
+    Logs successful discoveries (name, URL, skill count)
+  </Step>
+  
+  <Step title="Store results">
+    Stores discovered `(name, AgentCard)` pairs in `kernel.a2a_external_agents`
+  </Step>
+</Steps>
+
+<Note>
+Failed discoveries are logged as warnings but do not prevent boot.
+</Note>
+
+### Sending Tasks to External Agents
+
+```rust
+let client = A2aClient::new();
+let task = client.send_task(
+    "https://other-agent.example.com/a2a",
+    "Analyze this dataset for anomalies",
+    Some("session-123"),
+).await?;
+println!("Task {}: {:?}", task.id, task.status);
+```
+
+The client sends a JSON-RPC request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tasks/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [{ "type": "text", "text": "Analyze this dataset..." }]
+    },
+    "sessionId": "session-123"
+  }
+}
+```
+
+## Task Lifecycle
+
+An `A2aTask` tracks the full lifecycle of a cross-agent interaction:
+
+```rust
+pub struct A2aTask {
+    pub id: String,
+    pub session_id: Option<String>,
+    pub status: A2aTaskStatus,
+    pub messages: Vec<A2aMessage>,
+    pub artifacts: Vec<A2aArtifact>,
+}
+```
+
+### Task States
+
+| Status | Description |
+|--------|-------------|
+| `Submitted` | Task received but not yet started |
+| `Working` | Task is being actively processed by the agent |
+| `InputRequired` | Agent needs more information from the caller |
+| `Completed` | Task finished successfully |
+| `Cancelled` | Task was cancelled by the caller |
+| `Failed` | Task encountered an error |
+
+### Message Format
+
+Messages use an A2A-specific format with typed content parts:
+
+```rust
+pub struct A2aMessage {
+    pub role: String,          // "user" or "agent"
+    pub parts: Vec<A2aPart>,
+}
+
+pub enum A2aPart {
+    Text { text: String },
+    File { name: String, mime_type: String, data: String },  // base64
+    Data { mime_type: String, data: serde_json::Value },
+}
+```
+
+### Artifacts
+
+Tasks can produce artifacts (files, structured data) alongside messages:
+
+```rust
+pub struct A2aArtifact {
+    pub name: String,
+    pub parts: Vec<A2aPart>,
+}
+```
+
+## A2A Configuration
+
+A2A is configured in `config.toml` under the `[a2a]` section:
+
+```toml
+[a2a]
+enabled = true
+listen_path = "/a2a"
+
+[[a2a.external_agents]]
+name = "research-agent"
+url = "https://research.example.com"
+
+[[a2a.external_agents]]
+name = "data-analyst"
+url = "https://data.example.com"
+```
+
+### Configuration Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | `bool` | `false` | Whether A2A endpoints are active |
+| `listen_path` | `String` | `"/a2a"` | Base path for A2A endpoints |
+| `external_agents` | `Vec<ExternalAgent>` | `[]` | External agents to discover at boot |
+
+### External Agent Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `String` | Display name for this external agent |
+| `url` | `String` | Base URL where the agent's card is published |
+
+<Note>
+If `a2a` is `None` (not present in config), all A2A features are disabled. The A2A endpoints are always registered in the router but discovery and task store functionality requires `enabled = true`.
+</Note>
+
+## A2A API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/.well-known/agent.json` | Agent Card for the primary agent |
+| `GET` | `/a2a/agents` | List all agent cards |
+| `POST` | `/a2a/tasks/send` | Submit a task to an agent |
+| `GET` | `/a2a/tasks/{id}` | Get task status and messages |
+| `POST` | `/a2a/tasks/{id}/cancel` | Cancel a running task |
+
+### GET /.well-known/agent.json
+
+Returns the Agent Card for the first registered agent. If no agents are spawned, returns a placeholder card.
+
+### GET /a2a/agents
+
+Lists all registered agents as Agent Cards:
+
+```json
+{
+  "agents": [
+    {
+      "name": "code-reviewer",
+      "description": "Reviews code for bugs and security issues",
+      "url": "http://127.0.0.1:50051/a2a",
+      "version": "0.1.0",
+      "capabilities": {
+        "streaming": true,
+        "pushNotifications": false,
+        "stateTransitionHistory": true
+      },
+      "skills": [...],
+      "defaultInputModes": ["text"],
+      "defaultOutputModes": ["text"]
+    }
+  ],
+  "total": 1
+}
+```
+
+### POST /a2a/tasks/send
+
+Submit a task. Request body follows JSON-RPC 2.0 format:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tasks/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "parts": [{ "type": "text", "text": "Review this code for security issues" }]
+    },
+    "sessionId": "optional-session-id"
+  }
+}
+```
+
+Response (completed task):
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "optional-session-id",
+  "status": "completed",
+  "messages": [
+    {
+      "role": "user",
+      "parts": [{ "type": "text", "text": "Review this code for security issues" }]
+    },
+    {
+      "role": "agent",
+      "parts": [{ "type": "text", "text": "I found 2 potential issues..." }]
+    }
+  ],
+  "artifacts": []
+}
+```
+
+### GET /a2a/tasks/{id}
+
+Poll for task status. Returns `404` if the task is not found or has been evicted.
+
+### POST /a2a/tasks/{id}/cancel
+
+Cancel a running task. Sets its status to `Cancelled`. Returns `404` if the task is not found.
+
+## Security
+
+<CardGroup cols={2}>
+  <Card title="Rate Limiting" icon="gauge">
+    A2A endpoints go through the same GCRA rate limiter as all other API endpoints.
+  </Card>
+  
+  <Card title="API Authentication" icon="key">
+    When `api_key` is set in kernel config, all API endpoints (including A2A) require `Authorization: Bearer <key>` header. Exception: `/.well-known/agent.json` and health endpoint.
+  </Card>
+  
+  <Card title="Task Store Bounds" icon="box">
+    `A2aTaskStore` is bounded (default 1000 tasks) with FIFO eviction of completed/failed/cancelled tasks, preventing memory exhaustion.
+  </Card>
+  
+  <Card title="External Agent Discovery" icon="magnifying-glass">
+    `A2aClient` uses 30-second timeout and sends `User-Agent: OpenFang/0.1 A2A` header. Failed discoveries are logged but do not block kernel boot.
+  </Card>
+  
+  <Card title="Kernel-Level Protection" icon="shield">
+    A2A tool execution flows through the same security pipeline as all other tool calls: capability-based access control, tool result truncation (50K character hard cap), universal 60-second timeout, loop guard detection, and taint tracking.
+  </Card>
+</CardGroup>
+
+## Source Files
+
+- Protocol types and logic: `crates/openfang-runtime/src/a2a.rs`
+- API routes: `crates/openfang-api/src/routes.rs`
+- Config types: `crates/openfang-types/src/config.rs`

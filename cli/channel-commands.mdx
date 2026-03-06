@@ -1,0 +1,612 @@
+---
+title: Channel Commands
+description: Configure and manage messaging channel integrations
+---
+
+# Channel Commands
+
+Channels connect OpenFang agents to external messaging platforms like Telegram, Discord, Slack, and more. All channel commands are under the `openfang channel` namespace.
+
+## Listing Channels
+
+### openfang channel list
+
+List configured channels and their status.
+
+```bash
+openfang channel list
+```
+
+**Example Output:**
+
+```bash
+$ openfang channel list
+
+  Configured Channels
+
+  CHANNEL     ENV VAR                STATUS
+  webchat     (built-in)             Ready ✓
+  telegram    TELEGRAM_BOT_TOKEN     Ready ✓
+  discord     DISCORD_BOT_TOKEN      Ready ✓
+  slack       SLACK_BOT_TOKEN        Missing env ⚠
+  whatsapp    WHATSAPP_API_KEY       Not configured ✗
+  signal      SIGNAL_PHONE_NUMBER    Not configured ✗
+  matrix      MATRIX_ACCESS_TOKEN    Not configured ✗
+  email       SMTP_HOST              Not configured ✗
+
+  Total: 8 channels (3 ready, 1 missing env, 4 not configured)
+```
+
+**Status Values:**
+
+- **Ready ✓** - Channel is configured and credentials are valid
+- **Missing env ⚠** - Channel is configured in `config.toml` but environment variable is not set
+- **Not configured ✗** - Channel has not been set up
+
+<Note>
+  The `webchat` channel is built-in and always available via the web dashboard.
+</Note>
+
+## Setting Up Channels
+
+### openfang channel setup
+
+Interactive setup wizard for a channel integration.
+
+```bash
+openfang channel setup [<CHANNEL>]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<CHANNEL>` | Channel name (telegram, discord, slack, etc.). If omitted, displays an interactive picker. |
+
+**Supported Channels:**
+
+- `telegram` - Telegram bots
+- `discord` - Discord bots
+- `slack` - Slack apps
+- `whatsapp` - WhatsApp Business API
+- `email` - SMTP email
+- `signal` - Signal messenger
+- `matrix` - Matrix protocol
+
+### Telegram Setup
+
+```bash
+$ openfang channel setup telegram
+
+  ═══════════════════════════════════════════════════════════════
+  Telegram Bot Setup
+  ═══════════════════════════════════════════════════════════════
+
+  Step 1: Create a bot
+    1. Open Telegram and search for @BotFather
+    2. Send /newbot and follow the prompts
+    3. Copy the bot token (format: 123456:ABC-DEF...)
+
+  Step 2: Get your chat ID
+    1. Send a message to your bot
+    2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates
+    3. Look for "chat":{"id":<CHAT_ID>}
+
+  ───────────────────────────────────────────────────────────────
+
+  Paste your Telegram bot token: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+  Enter your chat ID: 987654321
+
+  [ok] Saved TELEGRAM_BOT_TOKEN to ~/.openfang/.env
+  [ok] Added telegram configuration to config.toml
+
+  Restart the daemon to activate: openfang stop && openfang start
+```
+
+**Generated Configuration:**
+
+```toml
+# config.toml
+[channels.telegram]
+enabled = true
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+chat_id = "987654321"
+```
+
+### Discord Setup
+
+```bash
+$ openfang channel setup discord
+
+  ═══════════════════════════════════════════════════════════════
+  Discord Bot Setup
+  ═══════════════════════════════════════════════════════════════
+
+  Step 1: Create a Discord application
+    1. Go to: https://discord.com/developers/applications
+    2. Click "New Application"
+    3. Go to "Bot" → "Add Bot"
+    4. Copy the bot token
+
+  Step 2: Enable intents
+    1. In Bot settings, enable:
+       - MESSAGE CONTENT INTENT
+       - SERVER MEMBERS INTENT
+    2. Click "Save Changes"
+
+  Step 3: Invite bot to your server
+    1. Go to "OAuth2" → "URL Generator"
+    2. Select scopes: bot
+    3. Select permissions: Send Messages, Read Message History
+    4. Copy and visit the generated URL
+
+  ───────────────────────────────────────────────────────────────
+
+  Paste your Discord bot token: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAuGhIjKl.MnOpQrStUvWxYzAbCdEfGhIjKlMnOpQr
+  Enter your server (guild) ID: 123456789012345678
+  Enter the channel ID for bot messages: 987654321098765432
+
+  [ok] Saved DISCORD_BOT_TOKEN to ~/.openfang/.env
+  [ok] Added discord configuration to config.toml
+
+  Restart the daemon to activate: openfang stop && openfang start
+```
+
+**Generated Configuration:**
+
+```toml
+# config.toml
+[channels.discord]
+enabled = true
+bot_token_env = "DISCORD_BOT_TOKEN"
+guild_id = "123456789012345678"
+channel_id = "987654321098765432"
+```
+
+### Slack Setup
+
+```bash
+$ openfang channel setup slack
+
+  ═══════════════════════════════════════════════════════════════
+  Slack App Setup
+  ═══════════════════════════════════════════════════════════════
+
+  Step 1: Create a Slack app
+    1. Go to: https://api.slack.com/apps
+    2. Click "Create New App" → "From scratch"
+    3. Name your app and select a workspace
+
+  Step 2: Add bot token scopes
+    1. Go to "OAuth & Permissions"
+    2. Add scopes:
+       - chat:write
+       - chat:write.public
+       - channels:history
+       - channels:read
+    3. Click "Install to Workspace"
+    4. Copy the "Bot User OAuth Token" (starts with xoxb-)
+
+  Step 3: Get channel ID
+    1. Right-click a channel → View channel details
+    2. Copy the channel ID from the bottom
+
+  ───────────────────────────────────────────────────────────────
+
+  Paste your Slack bot token: xoxb-1234567890-1234567890123-abcdefghijklmnopqrstuvwx
+  Enter the channel ID: C01ABC23DEF
+
+  [ok] Saved SLACK_BOT_TOKEN to ~/.openfang/.env
+  [ok] Added slack configuration to config.toml
+
+  Restart the daemon to activate: openfang stop && openfang start
+```
+
+**Generated Configuration:**
+
+```toml
+# config.toml
+[channels.slack]
+enabled = true
+bot_token_env = "SLACK_BOT_TOKEN"
+channel_id = "C01ABC23DEF"
+```
+
+### WhatsApp Setup
+
+```bash
+$ openfang channel setup whatsapp
+
+  ═══════════════════════════════════════════════════════════════
+  WhatsApp Business API Setup
+  ═══════════════════════════════════════════════════════════════
+
+  Requirements:
+    - WhatsApp Business API account
+    - API provider (Twilio, MessageBird, or Vonage)
+
+  For Twilio:
+    1. Go to: https://console.twilio.com/
+    2. Get Account SID and Auth Token
+    3. Set up a WhatsApp sender
+
+  ───────────────────────────────────────────────────────────────
+
+  Provider (twilio/messagebird/vonage): twilio
+  Account SID: AC1234567890abcdef1234567890abcdef
+  Auth Token: 1234567890abcdef1234567890abcdef
+  WhatsApp number (with +country code): +14155238886
+
+  [ok] Saved WHATSAPP_ACCOUNT_SID and WHATSAPP_AUTH_TOKEN to ~/.openfang/.env
+  [ok] Added whatsapp configuration to config.toml
+
+  Restart the daemon to activate: openfang stop && openfang start
+```
+
+### Email Setup
+
+```bash
+$ openfang channel setup email
+
+  ═══════════════════════════════════════════════════════════════
+  Email (SMTP) Setup
+  ═══════════════════════════════════════════════════════════════
+
+  SMTP server (e.g., smtp.gmail.com): smtp.gmail.com
+  SMTP port [587]: 587
+  Username (email address): agent@example.com
+  Password: ****************
+  From address [agent@example.com]: agent@example.com
+  Default recipient email: user@example.com
+
+  [ok] Saved SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD to ~/.openfang/.env
+  [ok] Added email configuration to config.toml
+
+  Restart the daemon to activate: openfang stop && openfang start
+```
+
+<Warning>
+  All credentials are saved to `~/.openfang/.env` with owner-only permissions (0600 on Unix). Never commit this file to version control.
+</Warning>
+
+## Testing Channels
+
+### openfang channel test
+
+Send a test message through a configured channel.
+
+```bash
+openfang channel test <CHANNEL>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<CHANNEL>` | Channel name to test |
+
+**Requirements:**
+
+- Daemon must be running
+- Channel must be configured and enabled
+
+**Example:**
+
+```bash
+$ openfang channel test telegram
+
+  Testing channel: telegram
+
+  [ok] Connected to Telegram API
+  [ok] Sent test message: "Hello from OpenFang! This is a test message."
+
+  Check your Telegram for the message.
+```
+
+**Test Message Content:**
+
+The test message includes:
+- Timestamp
+- OpenFang version
+- Confirmation that the channel is working
+
+<Note>
+  If the test fails, check the daemon logs: `openfang logs` or `~/.openfang/tui.log`
+</Note>
+
+## Enabling & Disabling Channels
+
+### openfang channel enable
+
+Enable a configured channel.
+
+```bash
+openfang channel enable <CHANNEL>
+```
+
+**Example:**
+
+```bash
+$ openfang channel enable discord
+
+  [ok] Enabled channel: discord
+
+  In daemon mode: Changes applied immediately
+  Without daemon: Restart required (openfang start)
+```
+
+### openfang channel disable
+
+Disable a channel without removing its configuration.
+
+```bash
+openfang channel disable <CHANNEL>
+```
+
+**Example:**
+
+```bash
+$ openfang channel disable slack
+
+  [ok] Disabled channel: slack
+
+  Configuration preserved. Re-enable with: openfang channel enable slack
+```
+
+<Note>
+  Disabling a channel keeps all configuration and credentials. The channel can be re-enabled without re-entering credentials.
+</Note>
+
+## Channel Configuration Reference
+
+### Telegram
+
+```toml
+[channels.telegram]
+enabled = true
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+chat_id = "123456789"
+parse_mode = "Markdown"  # or "HTML"
+```
+
+**Environment Variables:**
+- `TELEGRAM_BOT_TOKEN` - Bot token from @BotFather
+
+### Discord
+
+```toml
+[channels.discord]
+enabled = true
+bot_token_env = "DISCORD_BOT_TOKEN"
+guild_id = "123456789012345678"
+channel_id = "987654321098765432"
+```
+
+**Environment Variables:**
+- `DISCORD_BOT_TOKEN` - Bot token from Discord Developer Portal
+
+### Slack
+
+```toml
+[channels.slack]
+enabled = true
+bot_token_env = "SLACK_BOT_TOKEN"
+channel_id = "C01ABC23DEF"
+```
+
+**Environment Variables:**
+- `SLACK_BOT_TOKEN` - Bot User OAuth Token (starts with `xoxb-`)
+
+### WhatsApp (Twilio)
+
+```toml
+[channels.whatsapp]
+enabled = true
+provider = "twilio"
+account_sid_env = "WHATSAPP_ACCOUNT_SID"
+auth_token_env = "WHATSAPP_AUTH_TOKEN"
+from_number = "+14155238886"
+```
+
+**Environment Variables:**
+- `WHATSAPP_ACCOUNT_SID` - Twilio Account SID
+- `WHATSAPP_AUTH_TOKEN` - Twilio Auth Token
+
+### Email (SMTP)
+
+```toml
+[channels.email]
+enabled = true
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+username_env = "SMTP_USERNAME"
+password_env = "SMTP_PASSWORD"
+from_address = "agent@example.com"
+default_recipient = "user@example.com"
+```
+
+**Environment Variables:**
+- `SMTP_USERNAME` - Email address
+- `SMTP_PASSWORD` - Email password or app-specific password
+
+## Using Channels with Agents
+
+Once configured, agents can automatically respond to messages from channels.
+
+### Agent Channel Binding
+
+Bind an agent to specific channels in its manifest:
+
+```toml
+# agent.toml
+name = "support-agent"
+role = "Customer support assistant"
+
+[channels]
+enabled = ["telegram", "discord", "slack"]
+
+# Optional: per-channel settings
+[channels.telegram]
+reply_immediately = true
+max_response_length = 4000
+
+[channels.discord]
+use_embeds = true
+```
+
+### Message Flow
+
+1. **User sends message** via Telegram/Discord/Slack
+2. **Channel adapter** receives message and forwards to daemon
+3. **Agent processes** the message
+4. **Response sent back** through the same channel
+
+### Example Telegram Interaction
+
+```
+User (Telegram):
+  Hello, can you help me with Python?
+
+Agent (via Telegram):
+  Of course! I'm here to help with Python. What would you like to know?
+
+User:
+  How do I read a CSV file?
+
+Agent:
+  Here's how to read a CSV file in Python:
+
+  ```python
+  import csv
+
+  with open('data.csv', 'r') as file:
+      reader = csv.reader(file)
+      for row in reader:
+          print(row)
+  ```
+
+  Would you like me to explain any part of this code?
+```
+
+## Troubleshooting
+
+### Channel Not Responding
+
+**Check channel status:**
+
+```bash
+openfang channel list
+```
+
+**Verify environment variables:**
+
+```bash
+# Check if token is set
+echo $TELEGRAM_BOT_TOKEN
+
+# Run diagnostics
+openfang doctor
+```
+
+**Check daemon logs:**
+
+```bash
+openfang logs --follow
+```
+
+### Invalid Token Error
+
+```bash
+[!] Error: 401 Unauthorized - Invalid bot token
+hint: Verify your token in ~/.openfang/.env
+```
+
+**Solution:**
+
+1. Re-run setup: `openfang channel setup telegram`
+2. Or manually edit `~/.openfang/.env` with the correct token
+3. Restart daemon: `openfang stop && openfang start`
+
+### Permission Denied
+
+```bash
+[!] Error: Bot doesn't have permission to send messages
+hint: Check bot permissions in Discord/Slack settings
+```
+
+**Solution:**
+
+For Discord:
+1. Go to Discord Developer Portal
+2. Bot → Privileged Gateway Intents → Enable MESSAGE CONTENT INTENT
+3. Reinvite bot with correct permissions
+
+For Slack:
+1. Go to api.slack.com/apps
+2. OAuth & Permissions → Add missing scopes
+3. Reinstall app to workspace
+
+### Channel Webhook Not Found
+
+```bash
+[!] Error: Channel not found or bot not invited
+hint: Make sure the bot is in the channel/server
+```
+
+**Solution:**
+
+1. Verify bot is in the channel/server
+2. Check channel ID is correct
+3. For Discord: Bot needs "View Channel" permission
+
+## Advanced Configuration
+
+### Multi-Agent Channel Routing
+
+Route different channels to different agents:
+
+```toml
+# config.toml
+[routing]
+telegram = "support-agent"
+discord = "community-agent"
+slack = "internal-agent"
+email = "ticketing-agent"
+```
+
+### Rate Limiting
+
+Configure per-channel rate limits:
+
+```toml
+[channels.telegram]
+enabled = true
+rate_limit_messages = 20
+rate_limit_period_seconds = 60
+```
+
+### Message Formatting
+
+Customize message formatting per channel:
+
+```toml
+[channels.discord]
+use_embeds = true
+embed_color = 0x5865F2
+code_block_language = "python"
+
+[channels.telegram]
+parse_mode = "Markdown"
+disable_web_page_preview = true
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Commands" icon="diagram-project" href="/cli/workflow-commands">
+    Automate multi-step tasks
+  </Card>
+  <Card title="Channel Adapters" icon="puzzle-piece" href="/integrations/channels">
+    Learn about channel architecture
+  </Card>
+</CardGroup>

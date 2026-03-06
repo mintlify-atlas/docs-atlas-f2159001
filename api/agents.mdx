@@ -1,0 +1,428 @@
+---
+title: 'Agents API'
+description: 'Spawn, manage, and communicate with AI agents'
+---
+
+## Overview
+
+Agents are autonomous AI entities that process messages, execute tools, and maintain conversation context. Each agent has its own manifest, model, tools, and session history.
+
+## Spawn Agent
+
+Create a new agent from a TOML manifest:
+
+```bash POST /api/agents
+curl -X POST http://127.0.0.1:4200/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "manifest_toml": "name = \"assistant\"\nprofile = \"Full\"\n[model]\nprovider = \"anthropic\"\nmodel = \"claude-sonnet-4-20250514\""
+  }'
+```
+
+### Request Body
+
+<ParamField body="manifest_toml" type="string" required>
+  Agent manifest in TOML format. Maximum size: 1MB.
+</ParamField>
+
+<ParamField body="signed_manifest" type="string">
+  Optional Ed25519-signed manifest JSON for enhanced security.
+</ParamField>
+
+### Response
+
+<ResponseField name="agent_id" type="string">
+  UUID of the newly spawned agent
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the agent from the manifest
+</ResponseField>
+
+<ResponseExample>
+```json 201 Created
+{
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "assistant"
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<CodeGroup>
+```json 400 Bad Request
+{
+  "error": "Invalid manifest format"
+}
+```
+
+```json 403 Forbidden
+{
+  "error": "Manifest signature verification failed"
+}
+```
+
+```json 413 Payload Too Large
+{
+  "error": "Manifest too large (max 1MB)"
+}
+```
+</CodeGroup>
+
+## List Agents
+
+Get all active agents with enriched metadata:
+
+```bash GET /api/agents
+curl http://127.0.0.1:4200/api/agents
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "assistant",
+    "state": "Running",
+    "mode": "Auto",
+    "created_at": "2025-03-06T12:00:00Z",
+    "last_active": "2025-03-06T12:30:00Z",
+    "model_provider": "anthropic",
+    "model_name": "claude-sonnet-4-20250514",
+    "model_tier": "smart",
+    "auth_status": "configured",
+    "ready": true,
+    "profile": "Full",
+    "identity": {
+      "emoji": "🤖",
+      "avatar_url": null,
+      "color": "#3B82F6"
+    }
+  }
+]
+```
+</ResponseExample>
+
+## Get Agent
+
+Retrieve detailed information about a specific agent:
+
+```bash GET /api/agents/{id}
+curl http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "assistant",
+  "state": "Running",
+  "mode": "Auto",
+  "profile": "Full",
+  "created_at": "2025-03-06T12:00:00Z",
+  "session_id": "abc123-def456-789012",
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "capabilities": {
+    "tools": ["bash", "read", "write", "edit"],
+    "network": false
+  },
+  "description": "A helpful AI assistant",
+  "tags": ["general", "assistant"],
+  "identity": {
+    "emoji": "🤖",
+    "avatar_url": null,
+    "color": "#3B82F6"
+  },
+  "skills": [],
+  "skills_mode": "all",
+  "mcp_servers": [],
+  "mcp_servers_mode": "all",
+  "fallback_models": []
+}
+```
+</ResponseExample>
+
+## Send Message
+
+Send a message to an agent and receive a complete response:
+
+```bash POST /api/agents/{id}/message
+curl -X POST http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000/message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What is 2+2?"
+  }'
+```
+
+### Request Body
+
+<ParamField body="message" type="string" required>
+  The message to send to the agent. Maximum size: 64KB.
+</ParamField>
+
+<ParamField body="attachments" type="array">
+  Array of file attachment references from prior uploads.
+  
+  <Expandable title="Attachment Object">
+    <ParamField body="file_id" type="string">
+      UUID of the uploaded file
+    </ParamField>
+    <ParamField body="filename" type="string">
+      Original filename
+    </ParamField>
+    <ParamField body="content_type" type="string">
+      MIME type (only `image/*` types are processed)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Response
+
+<ResponseField name="response" type="string">
+  The agent's text response (with `<think>` tags stripped)
+</ResponseField>
+
+<ResponseField name="input_tokens" type="integer">
+  Total input tokens consumed across all iterations
+</ResponseField>
+
+<ResponseField name="output_tokens" type="integer">
+  Total output tokens generated across all iterations
+</ResponseField>
+
+<ResponseField name="iterations" type="integer">
+  Number of LLM turns taken (agent loop iterations)
+</ResponseField>
+
+<ResponseField name="cost_usd" type="number">
+  Estimated cost in USD (null if unavailable)
+</ResponseField>
+
+<ResponseExample>
+```json 200 OK
+{
+  "response": "2 + 2 equals 4.",
+  "input_tokens": 128,
+  "output_tokens": 12,
+  "iterations": 1,
+  "cost_usd": 0.000156
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<CodeGroup>
+```json 404 Not Found
+{
+  "error": "Agent not found"
+}
+```
+
+```json 413 Payload Too Large
+{
+  "error": "Message too large (max 64KB)"
+}
+```
+
+```json 429 Too Many Requests
+{
+  "error": "Message delivery failed: quota exceeded"
+}
+```
+</CodeGroup>
+
+## Stream Message (SSE)
+
+Send a message and receive a streaming response via Server-Sent Events:
+
+```bash POST /api/agents/{id}/message/stream
+curl -X POST http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000/message/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Tell me a story"}' \
+  --no-buffer
+```
+
+### Event Types
+
+<CodeGroup>
+```json event: chunk
+{
+  "content": "Once upon a time",
+  "done": false
+}
+```
+
+```json event: tool_use
+{
+  "tool": "bash"
+}
+```
+
+```json event: tool_result
+{
+  "tool": "bash",
+  "input": {"command": "ls -la"}
+}
+```
+
+```json event: phase
+{
+  "phase": "thinking",
+  "detail": "Analyzing request..."
+}
+```
+
+```json event: done
+{
+  "done": true,
+  "usage": {
+    "input_tokens": 256,
+    "output_tokens": 128
+  }
+}
+```
+</CodeGroup>
+
+## Get Agent Session
+
+Retrieve the agent's conversation history:
+
+```bash GET /api/agents/{id}/session
+curl http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000/session
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "session_id": "abc123-def456-789012",
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+  "message_count": 4,
+  "context_window_tokens": 1024,
+  "label": null,
+  "messages": [
+    {
+      "role": "User",
+      "content": "What is 2+2?"
+    },
+    {
+      "role": "Assistant",
+      "content": "2 + 2 equals 4."
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Change Agent Mode
+
+Switch the agent's operational mode:
+
+```bash PUT /api/agents/{id}/mode
+curl -X PUT http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000/mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "Manual"}'
+```
+
+### Request Body
+
+<ParamField body="mode" type="enum" required>
+  <Expandable title="Available Modes">
+    - `Auto`: Automatically use tools and respond
+    - `Manual`: Require approval for tool use
+    - `Observe`: Read-only mode (no actions)
+  </Expandable>
+</ParamField>
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "updated",
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "Manual"
+}
+```
+</ResponseExample>
+
+## Delete Agent
+
+Terminate an agent and release its resources:
+
+```bash DELETE /api/agents/{id}
+curl -X DELETE http://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "killed",
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+</ResponseExample>
+
+## Tool Profiles
+
+Get available tool profiles and their included tools:
+
+```bash GET /api/profiles
+curl http://127.0.0.1:4200/api/profiles
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "name": "minimal",
+    "tools": ["bash", "read", "write"]
+  },
+  {
+    "name": "coding",
+    "tools": ["bash", "read", "write", "edit", "glob", "grep"]
+  },
+  {
+    "name": "full",
+    "tools": ["bash", "read", "write", "edit", "glob", "grep", "web_fetch", "web_search"]
+  }
+]
+```
+</ResponseExample>
+
+## WebSocket Connection
+
+Connect to an agent via WebSocket for real-time bidirectional communication:
+
+```javascript
+const ws = new WebSocket('ws://127.0.0.1:4200/api/agents/550e8400-e29b-41d4-a716-446655440000/ws');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'message',
+    content: 'Hello!'
+  }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Agent:', data);
+};
+```
+
+<Info>
+WebSocket connections support Bearer authentication. See [Authentication](/api/authentication#websocket-authentication) for details.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Memory API" icon="brain" href="/api/memory">
+    Store and retrieve agent memories
+  </Card>
+  <Card title="Workflows API" icon="sitemap" href="/api/workflows">
+    Orchestrate multi-agent pipelines
+  </Card>
+</CardGroup>

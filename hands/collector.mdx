@@ -1,0 +1,421 @@
+---
+title: 'Collector Hand'
+description: 'Autonomous intelligence collector that monitors targets continuously with change detection'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+Collector Hand is an AI-powered intelligence collection engine that monitors any target (company, person, technology, market) 24/7, building a living knowledge graph and detecting changes over time.
+
+**Category:** Data  
+**Icon:** 🔍
+
+## What It Does
+
+<Steps>
+  <Step title="Define Target">
+    Specify what to monitor (company, person, technology, market, or topic)
+  </Step>
+  
+  <Step title="Continuous Collection">
+    Run scheduled sweeps across web sources, news, social media, and documents
+  </Step>
+  
+  <Step title="Build Knowledge Graph">
+    Extract entities and relationships, building a structured intelligence database
+  </Step>
+  
+  <Step title="Detect Changes">
+    Compare each cycle against previous state, identifying new developments
+  </Step>
+  
+  <Step title="Generate Reports">
+    Deliver intelligence reports highlighting key changes and trends
+  </Step>
+</Steps>
+
+## Configuration
+
+### Target Settings
+
+| Setting | Description | Example |
+|---------|-------------|----------|
+| **Target Subject** | What to monitor | `Tesla`, `Elon Musk`, `Rust language`, `EV market` |
+| **Focus Area** | Analysis lens | `market`, `business`, `competitor`, `person`, `technology` |
+| **Collection Depth** | How thorough | `surface`, `deep`, `exhaustive` |
+
+### Collection Schedule
+
+| Setting | Options | Use Case |
+|---------|---------|----------|
+| **Update Frequency** | `hourly`, `every_6h`, `daily`, `weekly` | How often to collect |
+| **Max Sources Per Cycle** | 10, 30, 50, 100 | Budget vs thoroughness |
+
+### Intelligence Features
+
+| Setting | Description |
+|---------|-------------|
+| **Alert on Changes** | Publish event when significant changes detected |
+| **Track Sentiment** | Analyze and track sentiment trends over time |
+| **Report Format** | `markdown`, `json`, `html` |
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate collector
+```
+
+Configure your target:
+
+```bash
+openfang hand config collector \
+  --set target_subject="Tesla" \
+  --set focus_area="business" \
+  --set collection_depth="deep" \
+  --set update_frequency="daily" \
+  --set alert_on_changes="true"
+```
+
+### Example Workflow
+
+```
+Monitor: Anthropic (company)
+Focus: Business intelligence
+Frequency: Daily updates
+Depth: Deep (full articles + sources)
+
+> Monitor Anthropic for product launches, partnerships, and leadership changes
+```
+
+Collector Hand will:
+1. Build initial target profile and query set
+2. Run daily collection sweeps
+3. Extract entities (people, products, events, partnerships)
+4. Store in knowledge graph
+5. Compare against yesterday's snapshot
+6. Generate `collector_report_2026-03-06.md` with changes
+7. Alert you if critical changes detected
+
+## How It Works
+
+### 1. Target Initialization
+
+Parses the target subject to determine type:
+
+| Target Type | Collection Strategy |
+|-------------|---------------------|
+| **Company** | Products, leadership, funding, partnerships, news |
+| **Person** | Publications, talks, job changes, social activity |
+| **Technology** | Releases, adoption, benchmarks, competitors |
+| **Market** | Trends, players, reports, regulations |
+| **Competitor** | Product launches, pricing, reviews, hiring |
+
+Builds initial query set (10-20 queries tailored to target type):
+
+```javascript
+// Example for company target "Anthropic"
+const queries = [
+  "Anthropic news",
+  "Anthropic product launch",
+  "Anthropic partnership",
+  "Anthropic funding",
+  "Anthropic leadership changes",
+  "Anthropic Claude API",
+  "Anthropic vs OpenAI",
+  "Anthropic latest 2026"
+]
+```
+
+### 2. Collection Sweep
+
+For each query (up to `max_sources_per_cycle`):
+
+<Steps>
+  <Step title="Search">
+    `web_search(query)` to find recent results
+  </Step>
+  
+  <Step title="Fetch">
+    `web_fetch(url)` promising articles, press releases, reports
+  </Step>
+  
+  <Step title="Extract">
+    Extract entities: people, companies, products, dates, numbers, events
+  </Step>
+  
+  <Step title="Tag">
+    Attach source URL, timestamp, confidence level, relevance score
+  </Step>
+</Steps>
+
+**Source quality heuristics:**
+
+| Source Type | Confidence | Examples |
+|-------------|------------|----------|
+| Official sources | High | Company website, SEC filings, press releases |
+| Established media | Medium-High | Reuters, Bloomberg, TechCrunch |
+| Blog posts, social | Medium | Personal blogs, Twitter, LinkedIn |
+| Forums, anonymous | Low | Reddit, HN comments (without verification) |
+
+### 3. Knowledge Graph Construction
+
+For each data point:
+
+```javascript
+// Add entities
+knowledge_add_entity({
+  type: "person",
+  name: "Dario Amodei",
+  role: "CEO",
+  company: "Anthropic",
+  last_seen: "2026-03-06"
+})
+
+knowledge_add_entity({
+  type: "product",
+  name: "Claude 3.5",
+  company: "Anthropic",
+  category: "LLM",
+  launch_date: "2024-06-20"
+})
+
+knowledge_add_entity({
+  type: "event",
+  description: "Series C funding round",
+  date: "2025-01-15",
+  amount: "$750M",
+  participants: ["Google", "Spark Capital"]
+})
+
+// Add relationships
+knowledge_add_relation({
+  from: "Dario Amodei",
+  to: "Anthropic",
+  type: "founded"
+})
+
+knowledge_add_relation({
+  from: "Anthropic",
+  to: "Claude 3.5",
+  type: "launched"
+})
+
+knowledge_add_relation({
+  from: "Google",
+  to: "Anthropic",
+  type: "invested_in",
+  metadata: {amount: "$300M", date: "2025-01-15"}
+})
+```
+
+### 4. Change Detection
+
+Compare current snapshot vs `collector_knowledge_base.json`:
+
+**Identified changes:**
+
+| Change Type | Significance | Example |
+|-------------|--------------|----------|
+| **New entities** | Critical/Important | New executive hire, new product launch |
+| **Changed attributes** | Critical | Person changed company, new funding round |
+| **New relationships** | Important | New partnership, acquisition |
+| **Disappeared entities** | Minor | No longer mentioned in sources |
+
+**Scoring changes:**
+
+```javascript
+function scoreChange(change) {
+  // Critical changes (trigger alerts)
+  if (change.type === "leadership_change") return "critical"
+  if (change.type === "acquisition") return "critical"
+  if (change.type === "major_funding") return "critical"
+  if (change.type === "product_launch") return "critical"
+  
+  // Important changes
+  if (change.type === "new_partnership") return "important"
+  if (change.type === "hiring_surge") return "important"
+  if (change.type === "pricing_change") return "important"
+  
+  // Minor changes
+  return "minor"
+}
+```
+
+If `alert_on_changes = true` and critical changes found:
+```javascript
+event_publish({
+  type: "collector_alert",
+  target: "Anthropic",
+  changes: [
+    "New partnership with Google Cloud announced",
+    "Dario Amodei interviewed on AI safety"
+  ]
+})
+```
+
+### 5. Sentiment Tracking (Optional)
+
+If `track_sentiment = true`:
+
+For each source, classify:
+- **Positive** — Praise, success stories, growth
+- **Negative** — Criticism, failures, controversy
+- **Neutral** — Factual reporting
+
+Track trend vs previous cycle:
+```javascript
+const sentiment = {
+  current: {positive: 60%, neutral: 30%, negative: 10%},
+  previous: {positive: 40%, neutral: 50%, negative: 10%},
+  trend: "sentiment_improving"
+}
+```
+
+### 6. Report Generation
+
+**Markdown format:**
+
+```markdown
+# Intelligence Report: Anthropic
+**Date**: 2026-03-06 | **Cycle**: 42 | **Sources Processed**: 28
+
+## Key Changes Since Last Report
+
+### Critical
+- **Partnership announced**: Google Cloud strategic partnership for enterprise Claude API
+- **Product launch**: Claude 3.5 Sonnet now supports 200K context window
+
+### Important
+- Dario Amodei interviewed on Lex Fridman podcast about AI safety
+- Hiring surge: 15 new ML research positions opened
+
+## Intelligence Summary
+
+Anthropic continues aggressive expansion in enterprise market with Google Cloud
+partnership announced March 5. The deal includes preferential pricing for GCP
+customers and integration with Vertex AI. CEO Dario Amodei emphasized safety
+and reliability in podcast appearance, positioning against OpenAI's rapid
+deployment strategy.
+
+Product development remains focused on context length and safety. Claude 3.5
+Sonnet update brings 200K context (vs 100K previously), maintaining quality
+at extended lengths. Internal benchmarks show 15% improvement on long-document
+tasks.
+
+## Entity Map
+
+| Entity | Type | Status | Confidence |
+|--------|------|--------|------------|
+| Dario Amodei | Person | CEO, active | High |
+| Claude 3.5 Sonnet | Product | Updated | High |
+| Google Cloud | Company | New partner | High |
+| Vertex AI | Product | Integration | Medium |
+
+## Sources
+
+1. [Anthropic announces Google Cloud partnership](https://anthropic.com/news) — confidence: high — Official press release, March 5
+2. [Lex Fridman podcast #412](https://youtube.com/...) — confidence: high — Dario Amodei interview
+3. [TechCrunch: Anthropic expands context window](https://techcrunch.com/...) — confidence: medium-high — March 6
+
+## Sentiment Trend
+Positive: 60% | Neutral: 30% | Negative: 10%  
+Trend: ↑ improving (up from 40% positive last cycle)
+```
+
+Saved as: `collector_report_2026-03-06.md`
+
+## Output
+
+| File | Description |
+|------|-------------|
+| `collector_report_YYYY-MM-DD.*` | Intelligence report for each cycle |
+| `collector_knowledge_base.json` | Cumulative knowledge graph |
+
+## Dashboard Metrics
+
+- **Data Points** — Total intelligence items collected
+- **Entities Tracked** — Unique entities in knowledge graph
+- **Reports Generated** — Number of reports delivered
+- **Last Update** — Timestamp of most recent collection
+
+## Use Cases
+
+### Competitive Intelligence
+
+```bash
+openfang hand config collector \
+  --set target_subject="Competitor Inc" \
+  --set focus_area="competitor" \
+  --set update_frequency="daily" \
+  --set alert_on_changes="true"
+```
+
+Monitor:
+- Product launches
+- Pricing changes
+- Customer reviews and sentiment
+- Hiring patterns
+- Partnerships
+
+### Person Tracking
+
+```bash
+openfang hand config collector \
+  --set target_subject="Sam Altman" \
+  --set focus_area="person" \
+  --set collection_depth="deep"
+```
+
+Track:
+- Public appearances
+- Interviews and talks
+- Social media activity
+- Company changes
+- Investments
+
+### Market Intelligence
+
+```bash
+openfang hand config collector \
+  --set target_subject="AI agent market" \
+  --set focus_area="market" \
+  --set collection_depth="exhaustive"
+```
+
+Analyze:
+- Market size and trends
+- New players
+- Regulatory changes
+- Technology shifts
+- Investment flows
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Start with Daily frequency — Hourly can be noisy for most targets
+- Use Deep collection depth for active targets, Surface for monitoring
+- Enable sentiment tracking for brand monitoring
+- Review knowledge graph monthly to prune outdated entities
+- Combine with Predictor Hand to forecast based on collected trends
+</Note>
+
+<Warning>
+Collector Hand only uses publicly available information. Never attempt to collect data behind login walls or from restricted sources.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Predictor Hand" icon="crystal-ball" href="/hands/predictor">
+    Make predictions based on collected intelligence
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Deep-dive research on discovered topics
+  </Card>
+</CardGroup>

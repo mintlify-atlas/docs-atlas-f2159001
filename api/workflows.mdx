@@ -1,0 +1,482 @@
+---
+title: 'Workflows API'
+description: 'Multi-agent pipelines and orchestration'
+---
+
+## Overview
+
+Workflows enable complex multi-agent pipelines where tasks flow between agents in sequence or parallel. Each workflow consists of steps that route tasks to specific agents.
+
+## Workflow Concepts
+
+### Workflow Structure
+
+<ParamField body="id" type="string">
+  Unique workflow ID (UUID)
+</ParamField>
+
+<ParamField body="name" type="string">
+  Human-readable workflow name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of what the workflow does
+</ParamField>
+
+<ParamField body="steps" type="array">
+  Array of workflow steps (see below)
+</ParamField>
+
+<ParamField body="created_at" type="string">
+  ISO 8601 creation timestamp
+</ParamField>
+
+### Step Structure
+
+<ParamField body="name" type="string">
+  Step name for logging/display
+</ParamField>
+
+<ParamField body="agent" type="object">
+  Agent reference (by ID or name)
+  <Expandable title="Agent Reference">
+    ```json
+    // By ID
+    {"id": "550e8400-e29b-41d4-a716-446655440000"}
+    
+    // By name
+    {"name": "code-reviewer"}
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField body="prompt" type="string">
+  Prompt template. Use `{{input}}` for previous output, `{{var_name}}` for variables.
+</ParamField>
+
+<ParamField body="mode" type="enum">
+  Execution mode:
+  - `sequential` (default)
+  - `fan_out` - Run in parallel with subsequent fan-out steps
+  - `collect` - Collect results from all preceding fan-out steps
+  - `conditional` - Skip if condition not met
+  - `loop` - Repeat until condition or max iterations
+</ParamField>
+
+<ParamField body="timeout_secs" type="integer">
+  Step timeout in seconds (default: 120)
+</ParamField>
+
+<ParamField body="error_mode" type="enum">
+  Error handling:
+  - `fail` (default) - Abort workflow on error
+  - `skip` - Skip step and continue
+  - `retry` - Retry up to N times
+</ParamField>
+
+<ParamField body="output_var" type="string">
+  Optional variable name to store step output
+</ParamField>
+
+## Create Workflow
+
+Register a new workflow definition:
+
+```bash POST /api/workflows
+curl -X POST http://127.0.0.1:4200/api/workflows \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Code Review Pipeline",
+    "description": "Analyze, review, and approve code changes",
+    "steps": [
+      {
+        "name": "analyze",
+        "agent_name": "code-analyzer",
+        "prompt": "Analyze this code: {{input}}",
+        "mode": "sequential",
+        "output_var": "analysis"
+      },
+      {
+        "name": "review",
+        "agent_name": "code-reviewer",
+        "prompt": "Review based on: {{analysis}}",
+        "mode": "sequential",
+        "error_mode": "retry",
+        "max_retries": 3
+      }
+    ]
+  }'
+```
+
+<ResponseExample>
+```json 201 Created
+{
+  "workflow_id": "abc123-def456-789012"
+}
+```
+</ResponseExample>
+
+## List Workflows
+
+Get all registered workflows:
+
+```bash GET /api/workflows
+curl http://127.0.0.1:4200/api/workflows
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "abc123-def456-789012",
+    "name": "Code Review Pipeline",
+    "description": "Analyze, review, and approve code changes",
+    "steps": 2,
+    "created_at": "2025-03-06T12:00:00Z"
+  }
+]
+```
+</ResponseExample>
+
+## Run Workflow
+
+Execute a workflow with input:
+
+```bash POST /api/workflows/{id}/run
+curl -X POST http://127.0.0.1:4200/api/workflows/abc123-def456-789012/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "function add(a, b) { return a + b; }"
+  }'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "run_id": "run-xyz789",
+  "output": "Code approved. Function is clean and well-structured.",
+  "status": "completed"
+}
+```
+</ResponseExample>
+
+## List Workflow Runs
+
+Get execution history for a workflow:
+
+```bash GET /api/workflows/{id}/runs
+curl http://127.0.0.1:4200/api/workflows/abc123-def456-789012/runs
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "run-xyz789",
+    "workflow_name": "Code Review Pipeline",
+    "state": {
+      "status": "completed"
+    },
+    "steps_completed": 2,
+    "started_at": "2025-03-06T12:00:00Z",
+    "completed_at": "2025-03-06T12:01:30Z"
+  }
+]
+```
+</ResponseExample>
+
+## Workflow Patterns
+
+### Sequential Pipeline
+
+Steps execute one after another:
+
+```json
+{
+  "steps": [
+    {
+      "name": "step1",
+      "agent_name": "agent1",
+      "prompt": "Process: {{input}}",
+      "mode": "sequential"
+    },
+    {
+      "name": "step2",
+      "agent_name": "agent2",
+      "prompt": "Refine: {{input}}",
+      "mode": "sequential"
+    }
+  ]
+}
+```
+
+### Fan-Out / Collect
+
+Run multiple agents in parallel, then collect results:
+
+```json
+{
+  "steps": [
+    {
+      "name": "analyze_security",
+      "agent_name": "security-agent",
+      "prompt": "Security audit: {{input}}",
+      "mode": "fan_out"
+    },
+    {
+      "name": "analyze_performance",
+      "agent_name": "perf-agent",
+      "prompt": "Performance audit: {{input}}",
+      "mode": "fan_out"
+    },
+    {
+      "name": "analyze_style",
+      "agent_name": "style-agent",
+      "prompt": "Style audit: {{input}}",
+      "mode": "fan_out"
+    },
+    {
+      "name": "summarize",
+      "agent_name": "summarizer",
+      "prompt": "Summarize audits: {{input}}",
+      "mode": "collect"
+    }
+  ]
+}
+```
+
+### Conditional Steps
+
+Skip steps based on conditions:
+
+```json
+{
+  "steps": [
+    {
+      "name": "check_tests",
+      "agent_name": "test-runner",
+      "prompt": "Run tests on: {{input}}",
+      "mode": "sequential",
+      "output_var": "test_result"
+    },
+    {
+      "name": "deploy",
+      "agent_name": "deployer",
+      "prompt": "Deploy if tests pass: {{test_result}}",
+      "mode": "conditional",
+      "condition": "passed"
+    }
+  ]
+}
+```
+
+The `deploy` step only runs if `test_result` contains "passed" (case-insensitive).
+
+### Loop Steps
+
+Repeat a step until a condition is met:
+
+```json
+{
+  "steps": [
+    {
+      "name": "refine_code",
+      "agent_name": "code-refiner",
+      "prompt": "Improve this code: {{input}}",
+      "mode": "loop",
+      "max_iterations": 5,
+      "until": "no more improvements"
+    }
+  ]
+}
+```
+
+The step repeats until:
+1. Output contains "no more improvements", or
+2. `max_iterations` (5) is reached
+
+## Error Handling
+
+### Fail (Default)
+
+Abort the workflow on any error:
+
+```json
+{
+  "error_mode": "fail"
+}
+```
+
+### Skip
+
+Skip failed steps and continue:
+
+```json
+{
+  "error_mode": "skip"
+}
+```
+
+### Retry
+
+Retry failed steps up to N times:
+
+```json
+{
+  "error_mode": "retry",
+  "max_retries": 3
+}
+```
+
+## Variable Substitution
+
+Use variables in prompt templates:
+
+- `{{input}}` - Previous step's output
+- `{{var_name}}` - Named output variable from any step
+
+```json
+{
+  "steps": [
+    {
+      "name": "analyze",
+      "agent_name": "analyzer",
+      "prompt": "Analyze: {{input}}",
+      "output_var": "analysis"
+    },
+    {
+      "name": "summarize",
+      "agent_name": "summarizer",
+      "prompt": "Summarize: {{analysis}}"
+    }
+  ]
+}
+```
+
+## Workflow State
+
+Workflow runs progress through states:
+
+- `pending` - Queued but not started
+- `running` - Currently executing
+- `completed` - Successfully finished
+- `failed` - Encountered an error
+
+## Step Results
+
+Each completed step stores:
+
+<ResponseField name="step_name" type="string">
+  Name of the step
+</ResponseField>
+
+<ResponseField name="agent_id" type="string">
+  UUID of the agent that executed the step
+</ResponseField>
+
+<ResponseField name="agent_name" type="string">
+  Name of the agent
+</ResponseField>
+
+<ResponseField name="output" type="string">
+  Step output text
+</ResponseField>
+
+<ResponseField name="input_tokens" type="integer">
+  Input tokens consumed
+</ResponseField>
+
+<ResponseField name="output_tokens" type="integer">
+  Output tokens generated
+</ResponseField>
+
+<ResponseField name="duration_ms" type="integer">
+  Step duration in milliseconds
+</ResponseField>
+
+## Run Retention
+
+The workflow engine retains up to **200 workflow runs**. When this limit is exceeded, the oldest completed/failed runs are evicted automatically.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Timeouts" icon="clock">
+    Set realistic timeouts for each step (default: 120s)
+  </Card>
+  <Card title="Error Handling" icon="shield-check">
+    Use retry for transient failures, skip for optional steps
+  </Card>
+  <Card title="Fan-Out" icon="code-branch">
+    Parallelize independent tasks with fan-out/collect
+  </Card>
+  <Card title="Variables" icon="brackets-curly">
+    Store intermediate results in variables for reuse
+  </Card>
+</CardGroup>
+
+## Example: CI/CD Pipeline
+
+```json
+{
+  "name": "CI/CD Pipeline",
+  "description": "Test, build, and deploy application",
+  "steps": [
+    {
+      "name": "run_tests",
+      "agent_name": "test-agent",
+      "prompt": "Run all tests for: {{input}}",
+      "mode": "sequential",
+      "output_var": "test_results",
+      "error_mode": "fail"
+    },
+    {
+      "name": "build",
+      "agent_name": "build-agent",
+      "prompt": "Build application: {{input}}",
+      "mode": "sequential",
+      "output_var": "build_artifact"
+    },
+    {
+      "name": "security_scan",
+      "agent_name": "security-agent",
+      "prompt": "Scan for vulnerabilities: {{build_artifact}}",
+      "mode": "sequential",
+      "error_mode": "retry",
+      "max_retries": 2
+    },
+    {
+      "name": "deploy_staging",
+      "agent_name": "deploy-agent",
+      "prompt": "Deploy to staging: {{build_artifact}}",
+      "mode": "sequential",
+      "timeout_secs": 300
+    },
+    {
+      "name": "smoke_tests",
+      "agent_name": "test-agent",
+      "prompt": "Run smoke tests on staging",
+      "mode": "sequential"
+    },
+    {
+      "name": "deploy_production",
+      "agent_name": "deploy-agent",
+      "prompt": "Deploy to production: {{build_artifact}}",
+      "mode": "conditional",
+      "condition": "all tests passed",
+      "timeout_secs": 600
+    }
+  ]
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agents API" icon="robot" href="/api/agents">
+    Learn how to spawn workflow agents
+  </Card>
+  <Card title="Memory API" icon="brain" href="/api/memory">
+    Store workflow state in memory
+  </Card>
+</CardGroup>

@@ -1,0 +1,369 @@
+---
+title: 'Memory API'
+description: 'Semantic memory, knowledge graphs, and key-value storage'
+---
+
+## Overview
+
+OpenFang provides a unified memory substrate with three layers:
+
+1. **Key-Value Store** - Structured data storage per agent
+2. **Semantic Memory** - Vector-based recall with embeddings
+3. **Knowledge Graph** - Entity-relation graph for structured knowledge
+
+## Key-Value Store
+
+Simple key-value storage scoped to individual agents.
+
+### Get All Keys
+
+```bash GET /api/memory/agents/{id}/kv
+curl http://127.0.0.1:4200/api/memory/agents/550e8400-e29b-41d4-a716-446655440000/kv
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "user_preferences": {"theme": "dark", "language": "en"},
+  "last_checkpoint": "2025-03-06T12:00:00Z",
+  "task_count": 42
+}
+```
+</ResponseExample>
+
+### Get Value by Key
+
+```bash GET /api/memory/agents/{id}/kv/{key}
+curl http://127.0.0.1:4200/api/memory/agents/550e8400-e29b-41d4-a716-446655440000/kv/user_preferences
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "theme": "dark",
+  "language": "en"
+}
+```
+</ResponseExample>
+
+### Set Value
+
+```bash PUT /api/memory/agents/{id}/kv/{key}
+curl -X PUT http://127.0.0.1:4200/api/memory/agents/550e8400-e29b-41d4-a716-446655440000/kv/user_preferences \
+  -H "Content-Type: application/json" \
+  -d '{"theme": "dark", "language": "en"}'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "ok"
+}
+```
+</ResponseExample>
+
+### Delete Key
+
+```bash DELETE /api/memory/agents/{id}/kv/{key}
+curl -X DELETE http://127.0.0.1:4200/api/memory/agents/550e8400-e29b-41d4-a716-446655440000/kv/user_preferences
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "deleted"
+}
+```
+</ResponseExample>
+
+## Semantic Memory
+
+Vector-based memory storage with automatic embedding and semantic recall.
+
+### Memory Fragment Structure
+
+<ParamField body="id" type="string">
+  Unique memory ID (UUID)
+</ParamField>
+
+<ParamField body="agent_id" type="string">
+  Owner agent ID
+</ParamField>
+
+<ParamField body="content" type="string">
+  Textual content of the memory
+</ParamField>
+
+<ParamField body="embedding" type="array">
+  Vector embedding (generated automatically)
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Arbitrary key-value metadata
+</ParamField>
+
+<ParamField body="source" type="enum">
+  Memory source type:
+  - `conversation`
+  - `document`
+  - `observation`
+  - `inference`
+  - `user_provided`
+  - `system`
+</ParamField>
+
+<ParamField body="confidence" type="number">
+  Confidence score (0.0 - 1.0)
+</ParamField>
+
+<ParamField body="scope" type="string">
+  Memory scope/collection (e.g., "episodic", "semantic")
+</ParamField>
+
+<ParamField body="created_at" type="string">
+  ISO 8601 timestamp
+</ParamField>
+
+<ParamField body="accessed_at" type="string">
+  Last access timestamp
+</ParamField>
+
+<ParamField body="access_count" type="integer">
+  Number of times accessed
+</ParamField>
+
+### Store Memory
+
+Memories are stored via the kernel's memory trait implementation. To add a memory programmatically:
+
+```rust
+let memory_id = kernel.memory.remember(
+    agent_id,
+    "The user prefers dark mode",
+    MemorySource::UserProvided,
+    "preferences",
+    metadata,
+).await?;
+```
+
+### Recall Memories
+
+Perform semantic search over stored memories:
+
+```rust
+let memories = kernel.memory.recall(
+    "What are the user's preferences?",
+    5, // limit
+    Some(MemoryFilter::agent(agent_id)),
+).await?;
+```
+
+### Memory Filters
+
+Filter memories by various criteria:
+
+<ParamField body="agent_id" type="string">
+  Filter by agent
+</ParamField>
+
+<ParamField body="source" type="enum">
+  Filter by source type
+</ParamField>
+
+<ParamField body="scope" type="string">
+  Filter by scope/collection
+</ParamField>
+
+<ParamField body="min_confidence" type="number">
+  Minimum confidence threshold
+</ParamField>
+
+<ParamField body="after" type="string">
+  Only memories created after this timestamp
+</ParamField>
+
+<ParamField body="before" type="string">
+  Only memories created before this timestamp
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Metadata key-value filters
+</ParamField>
+
+## Knowledge Graph
+
+Structured entity-relation graph for representing complex knowledge.
+
+### Entity Types
+
+- `person` - A person
+- `organization` - An organization
+- `project` - A project
+- `concept` - A concept or idea
+- `event` - An event
+- `location` - A location
+- `document` - A document
+- `tool` - A tool
+- `custom(string)` - Custom type
+
+### Relation Types
+
+- `works_at` - Entity works at organization
+- `knows_about` - Entity knows about concept
+- `related_to` - Entities are related
+- `depends_on` - Entity depends on another
+- `owned_by` - Entity is owned by another
+- `created_by` - Entity was created by another
+- `located_in` - Entity is located in another
+- `part_of` - Entity is part of another
+- `uses` - Entity uses another
+- `produces` - Entity produces another
+- `custom(string)` - Custom relation
+
+### Add Entity
+
+```rust
+let entity = Entity {
+    id: "john_doe".to_string(),
+    entity_type: EntityType::Person,
+    name: "John Doe".to_string(),
+    properties: HashMap::from([
+        ("email".to_string(), json!("john@example.com")),
+        ("role".to_string(), json!("developer")),
+    ]),
+    created_at: Utc::now(),
+    updated_at: Utc::now(),
+};
+
+kernel.memory.add_entity(entity).await?;
+```
+
+### Add Relation
+
+```rust
+let relation = Relation {
+    source: "john_doe".to_string(),
+    relation: RelationType::WorksAt,
+    target: "acme_corp".to_string(),
+    properties: HashMap::new(),
+    confidence: 0.95,
+    created_at: Utc::now(),
+};
+
+kernel.memory.add_relation(relation).await?;
+```
+
+### Query Graph
+
+```rust
+let pattern = GraphPattern {
+    source: Some("john_doe".to_string()),
+    relation: Some(RelationType::WorksAt),
+    target: None,
+    max_depth: 2,
+};
+
+let matches = kernel.memory.query_graph(pattern).await?;
+```
+
+<ResponseExample>
+```rust
+vec![
+    GraphMatch {
+        source: Entity { id: "john_doe", ... },
+        relation: Relation { relation: WorksAt, ... },
+        target: Entity { id: "acme_corp", ... },
+    }
+]
+```
+</ResponseExample>
+
+## Memory Consolidation
+
+Optimize and clean up memory storage:
+
+```rust
+let report = kernel.memory.consolidate().await?;
+```
+
+<ResponseField name="memories_merged" type="integer">
+  Number of duplicate memories merged
+</ResponseField>
+
+<ResponseField name="memories_decayed" type="integer">
+  Number of memories whose confidence decayed
+</ResponseField>
+
+<ResponseField name="duration_ms" type="integer">
+  Consolidation duration in milliseconds
+</ResponseField>
+
+## Export & Import
+
+Export all memory data for backup or migration:
+
+```rust
+let data = kernel.memory.export(ExportFormat::Json).await?;
+std::fs::write("memory_backup.json", data)?;
+```
+
+Import from backup:
+
+```rust
+let data = std::fs::read("memory_backup.json")?;
+let report = kernel.memory.import(&data, ExportFormat::Json).await?;
+```
+
+<ResponseField name="entities_imported" type="integer">
+  Number of entities imported
+</ResponseField>
+
+<ResponseField name="relations_imported" type="integer">
+  Number of relations imported
+</ResponseField>
+
+<ResponseField name="memories_imported" type="integer">
+  Number of memory fragments imported
+</ResponseField>
+
+<ResponseField name="errors" type="array">
+  Import errors encountered
+</ResponseField>
+
+## Memory Scopes
+
+Organize memories into scopes for different use cases:
+
+- **episodic** - Conversation-specific memories
+- **semantic** - General knowledge and facts
+- **procedural** - How-to knowledge and procedures
+- **preferences** - User preferences and settings
+- **observations** - Tool outputs and observations
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Scopes" icon="tags">
+    Organize memories into logical scopes for easier filtering
+  </Card>
+  <Card title="Set Confidence" icon="chart-line">
+    Assign confidence scores to help prioritize recall results
+  </Card>
+  <Card title="Metadata" icon="database">
+    Enrich memories with metadata for advanced filtering
+  </Card>
+  <Card title="Consolidate" icon="broom">
+    Periodically consolidate to merge duplicates and decay old memories
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agents API" icon="robot" href="/api/agents">
+    Learn how agents interact with memory
+  </Card>
+  <Card title="Workflows API" icon="sitemap" href="/api/workflows">
+    Use memory in multi-agent workflows
+  </Card>
+</CardGroup>

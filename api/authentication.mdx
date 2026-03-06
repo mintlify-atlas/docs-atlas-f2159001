@@ -1,0 +1,182 @@
+---
+title: 'Authentication'
+description: 'Secure your OpenFang API with Bearer token authentication'
+---
+
+## Overview
+
+OpenFang supports optional Bearer token authentication for securing API access. When enabled, all requests must include a valid API key.
+
+## Configuration
+
+Set the API key in `~/.openfang/config.toml`:
+
+```toml
+api_key = "your-secret-key-here"
+```
+
+<Warning>
+**Important**: If `api_key` is empty or not set, authentication is **disabled** and all requests are accepted. This is convenient for local development but insecure for production.
+</Warning>
+
+## Authentication Methods
+
+OpenFang accepts API keys via two methods:
+
+### 1. Authorization Header (Recommended)
+
+Include the API key as a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer your-secret-key-here" \
+  http://127.0.0.1:4200/api/agents
+```
+
+### 2. X-API-Key Header (Alternative)
+
+For clients that can't set Authorization headers:
+
+```bash
+curl -H "X-API-Key: your-secret-key-here" \
+  http://127.0.0.1:4200/api/agents
+```
+
+## Security Features
+
+### Constant-Time Comparison
+
+API key validation uses constant-time comparison via `subtle::ConstantTimeEq` to prevent timing attacks:
+
+```rust
+token.as_bytes().ct_eq(api_key.as_bytes()).into()
+```
+
+### Loopback Exemption
+
+Requests from `127.0.0.1` or `::1` bypass authentication when API key is set, allowing local CLI access:
+
+```rust
+if addr.ip().is_loopback() {
+    return Ok(next.run(req).await);
+}
+```
+
+<Info>
+This means you can use `openfang` CLI commands locally without needing to pass the API key, even when authentication is enabled.
+</Info>
+
+## Error Responses
+
+When authentication fails, the API returns:
+
+**Status Code**: `401 Unauthorized`
+
+**Headers**:
+```
+WWW-Authenticate: Bearer
+```
+
+**Body**:
+```json
+{
+  "error": "Missing Authorization: Bearer <api_key> header"
+}
+```
+
+## WebSocket Authentication
+
+WebSocket connections (`/api/agents/{id}/ws`) also support Bearer authentication:
+
+```javascript
+const ws = new WebSocket('ws://127.0.0.1:4200/api/agents/abc123/ws');
+
+// Send auth token in first message
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'auth',
+    token: 'your-secret-key-here'
+  }));
+};
+```
+
+Alternatively, pass the token as a query parameter:
+
+```javascript
+const ws = new WebSocket('ws://127.0.0.1:4200/api/agents/abc123/ws?token=your-secret-key-here');
+```
+
+## Rate Limiting
+
+Authenticated requests are subject to the same rate limits as unauthenticated requests:
+
+- **30 requests/second** per IP (default)
+- Configurable via GCRA rate limiter
+
+See [API Overview](/api/overview#rate-limiting) for details.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Strong Keys" icon="shield-halved">
+    Generate API keys with at least 32 bytes of entropy:
+    ```bash
+    openssl rand -base64 32
+    ```
+  </Card>
+  <Card title="Rotate Regularly" icon="rotate">
+    Change API keys periodically and after any suspected compromise
+  </Card>
+  <Card title="HTTPS in Production" icon="lock">
+    Always use HTTPS when exposing the API over a network
+  </Card>
+  <Card title="Environment Variables" icon="code">
+    Store API keys in environment variables, not in code:
+    ```bash
+    export OPENFANG_API_KEY="..."
+    ```
+  </Card>
+</CardGroup>
+
+## Signed Manifests
+
+For enhanced security when spawning agents, OpenFang supports Ed25519-signed manifests:
+
+```bash
+curl -X POST http://127.0.0.1:4200/api/agents \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "manifest_toml": "name = \"trusted-agent\"\n...",
+    "signed_manifest": "{\"manifest\":\"...\",\"signature\":\"...\"}"
+  }'
+```
+
+The kernel verifies the Ed25519 signature before spawning the agent. Signature verification failures return `403 Forbidden`.
+
+## Audit Trail
+
+All authentication events are logged to the audit trail:
+
+```bash
+curl http://127.0.0.1:4200/api/audit/recent
+```
+
+<ResponseExample>
+```json
+[
+  {
+    "actor": "127.0.0.1",
+    "action": "AuthAttempt",
+    "resource": "api_key",
+    "details": "success",
+    "timestamp": "2025-03-06T12:00:00Z"
+  }
+]
+```
+</ResponseExample>
+
+## Next Steps
+
+<Card title="Agents API" icon="robot" href="/api/agents">
+  Start making authenticated requests to spawn and manage agents
+</Card>

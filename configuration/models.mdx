@@ -1,0 +1,349 @@
+---
+title: Model Configuration
+description: Configure LLM models, routing, and fallback chains in OpenFang
+---
+
+OpenFang supports 123+ models across 27 providers with intelligent routing, automatic fallback, and per-agent model overrides.
+
+## Default Model
+
+Every OpenFang instance requires a default model:
+
+```toml
+[default_model]
+provider = "anthropic"                    # Provider identifier
+model = "claude-sonnet-4-20250514"        # Model identifier
+api_key_env = "ANTHROPIC_API_KEY"         # Environment variable for API key
+# base_url = "https://api.anthropic.com"  # Optional: custom endpoint
+```
+
+<ParamField path="provider" type="string" required>
+  Provider identifier. See [Providers](/configuration/providers) for all options.
+</ParamField>
+
+<ParamField path="model" type="string" required>
+  Model identifier from the provider's catalog. Use `openfang models list` to see all available models.
+</ParamField>
+
+<ParamField path="api_key_env" type="string" required>
+  Name of the environment variable containing the API key (NOT the key itself).
+</ParamField>
+
+<ParamField path="base_url" type="string">
+  Override the default API endpoint. Useful for proxies or self-hosted instances.
+</ParamField>
+
+## Fallback Provider Chain
+
+Configure automatic failover to backup providers when the primary fails:
+
+```toml
+[default_model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+
+# Tried in order if primary fails
+[[fallback_providers]]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+
+[[fallback_providers]]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[[fallback_providers]]
+provider = "ollama"
+model = "llama3.2:latest"
+# No API key needed for local Ollama
+```
+
+<Note>
+Fallback chains are tried sequentially. The first successful provider is used. This provides resilience against rate limits, outages, and API errors.
+</Note>
+
+## Model Tiers
+
+OpenFang categorizes models into tiers based on capability and cost:
+
+| Tier | Description | Use Cases | Examples |
+|------|-------------|-----------|----------|
+| **Frontier** | Most capable, highest cost | Complex reasoning, research, code generation | Claude Opus 4, GPT-4o, Gemini 2.0 Flash Thinking |
+| **Smart** | Balanced capability/cost | General agent tasks, analysis | Claude Sonnet 4, GPT-4o-mini, Gemini 2.0 Flash |
+| **Balanced** | Good performance, moderate cost | Standard workflows, data processing | Llama 3.3 70B, Qwen Plus |
+| **Fast** | High speed, low cost | Simple tasks, high volume | Claude Haiku 4.5, Groq Llama 3.3, GLM-4 Flash |
+| **Local** | Self-hosted, zero cost | Privacy-critical, offline | Ollama models, LM Studio |
+| **Custom** | User-defined models | Custom endpoints, experiments | - |
+
+## Per-Agent Model Override
+
+Agents can use different models than the system default:
+
+<CodeGroup>
+```toml Agent TOML
+name = "coder"
+description = "Expert coding assistant"
+
+[model]
+provider = "openai"
+model = "gpt-4o"
+
+[capabilities]
+tools = ["shell", "file_read", "file_write", "web_fetch"]
+```
+
+```bash CLI Override
+openfang agent update coder --model "claude-sonnet-4-20250514"
+```
+
+```bash API Override
+curl -X PUT http://localhost:4200/api/agents/coder/model \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514"
+  }'
+```
+</CodeGroup>
+
+## Custom Provider URLs
+
+Override base URLs for proxies, custom endpoints, or self-hosted models:
+
+```toml
+# OpenAI-compatible proxy
+[provider_urls]
+openai = "https://my-proxy.internal/v1"
+
+# Self-hosted Ollama
+[provider_urls]
+ollama = "http://gpu-server.local:11434"
+
+# Custom vLLM deployment
+[provider_urls]
+vllm = "http://10.0.0.50:8000/v1"
+
+# Azure OpenAI
+[provider_urls]
+openai = "https://my-resource.openai.azure.com/openai/deployments/gpt-4o"
+```
+
+<Warning>
+When using custom URLs, ensure the endpoint is OpenAI API-compatible. OpenFang uses three drivers: Anthropic, Gemini, and OpenAI-compatible.
+</Warning>
+
+## Model Aliases
+
+Use short aliases instead of full model identifiers:
+
+```bash
+# Instead of "claude-sonnet-4-20250514"
+openfang chat --model sonnet
+
+# Instead of "gpt-4o-2024-08-06" 
+openfang chat --model gpt4
+
+# Instead of "llama-3.3-70b-versatile"
+openfang chat --model llama
+```
+
+View all available aliases:
+
+```bash
+openfang models aliases
+```
+
+## Model Capabilities
+
+Different models support different features:
+
+### Tool Calling (Function Calling)
+
+Most modern models support tool calling:
+
+- ✅ Claude 3+, GPT-4+, Gemini 1.5+, Llama 3.1+
+- ❌ Older models, some vision-only models
+
+### Vision (Image Understanding)
+
+Models that can process images:
+
+- Claude Opus/Sonnet 4, GPT-4o/4-turbo, Gemini 2.0 Flash, Qwen VL
+
+### Streaming
+
+All major providers support streaming responses except:
+
+- Some Replicate models
+- Certain Bedrock configurations
+
+## Cost Tracking
+
+OpenFang automatically tracks token usage and estimated costs:
+
+```toml
+# Display usage info in response footers
+usage_footer = "Full"  # "Off", "Tokens", "Cost", or "Full"
+```
+
+View cost analytics:
+
+```bash
+# Total budget across all agents
+openfang budget
+
+# Per-agent spending
+openfang budget agents
+
+# Specific agent
+openfang budget agent coder
+```
+
+## Session Compaction
+
+Automatically compress conversation history when it grows too large:
+
+```toml
+[compaction]
+threshold = 80                          # Compact when messages exceed this count
+keep_recent = 20                        # Keep this many recent messages
+max_summary_tokens = 1024               # Max tokens for LLM-generated summary
+```
+
+<Note>
+Compaction uses an LLM to summarize older messages, preserving context while reducing token usage. The most recent messages are always kept intact.
+</Note>
+
+## Embedding Models
+
+Configure models for vector embeddings (memory search):
+
+```toml
+[memory]
+provider = "openai"
+model = "text-embedding-3-small"
+api_key_env = "OPENAI_API_KEY"
+```
+
+Supported embedding providers:
+
+- **OpenAI**: `text-embedding-3-small`, `text-embedding-3-large`
+- **Cohere**: `embed-english-v3.0`, `embed-multilingual-v3.0`
+- **Voyage**: `voyage-2`, `voyage-code-2`
+- **Local**: `ollama/nomic-embed-text`
+
+## Model Discovery
+
+OpenFang can auto-discover models from local providers:
+
+```bash
+# List all available models (includes discovered)
+openfang models list
+
+# Filter by provider
+openfang models list --provider ollama
+
+# Show only configured providers
+openfang models list --available
+```
+
+For Ollama, models are dynamically discovered from `http://localhost:11434/api/tags`.
+
+## Model Routing Examples
+
+<CodeGroup>
+```toml Cost-Optimized
+# Use cheapest model that works
+[default_model]
+provider = "groq"
+model = "llama-3.3-70b-versatile"  # Free tier available
+api_key_env = "GROQ_API_KEY"
+
+[[fallback_providers]]
+provider = "ollama"
+model = "llama3.2:latest"  # Fully local, zero cost
+```
+
+```toml Performance-Optimized
+# Use most capable models
+[default_model]
+provider = "anthropic"
+model = "claude-opus-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[[fallback_providers]]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+```
+
+```toml Privacy-Optimized
+# All inference happens locally
+[default_model]
+provider = "ollama"
+model = "llama3.2:latest"
+
+[[fallback_providers]]
+provider = "lmstudio"
+model = "llama-3.3-70b"
+```
+
+```toml Multi-Region
+# Route to different regions for redundancy
+[default_model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[[fallback_providers]]
+provider = "bedrock"  # AWS Bedrock in different region
+model = "bedrock/anthropic.claude-sonnet-4-6"
+api_key_env = "AWS_ACCESS_KEY_ID"
+```
+</CodeGroup>
+
+## Troubleshooting
+
+### Model Not Found
+
+```bash
+# Check if model exists in catalog
+openfang models list | grep sonnet
+
+# Check provider configuration
+openfang providers status
+```
+
+### API Key Issues
+
+```bash
+# Verify environment variable is set
+echo $ANTHROPIC_API_KEY
+
+# Test provider connectivity
+openfang providers test anthropic
+```
+
+### Rate Limits
+
+Configure fallback providers to handle rate limits automatically:
+
+```toml
+[[fallback_providers]]
+provider = "groq"  # Free tier: 30 req/min
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Provider Setup" icon="plug" href="/configuration/providers">
+    Configure all 27 LLM providers
+  </Card>
+  <Card title="Channel Configuration" icon="message" href="/configuration/channels">
+    Connect messaging platforms
+  </Card>
+</CardGroup>

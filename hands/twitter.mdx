@@ -1,0 +1,505 @@
+---
+title: 'Twitter Hand'
+description: 'Autonomous Twitter/X manager for content creation, scheduling, and engagement'
+icon: 'twitter'
+---
+
+## Overview
+
+Twitter Hand is an AI-powered social media manager that creates content, manages your posting schedule, handles engagement, and tracks performance — all while maintaining your unique voice.
+
+**Category:** Communication  
+**Icon:** 𝕏 (X logo)
+
+## What It Does
+
+<Steps>
+  <Step title="Content Research">
+    Analyze trending topics in your niche and identify content gaps
+  </Step>
+  
+  <Step title="Generate Content">
+    Create tweets, threads, and replies matching your brand voice
+  </Step>
+  
+  <Step title="Build Queue">
+    Maintain a queue of ready-to-post content (approval mode by default)
+  </Step>
+  
+  <Step title="Manage Posting">
+    Post on schedule or write to queue for your review
+  </Step>
+  
+  <Step title="Engage">
+    Reply to mentions and like relevant content (when enabled)
+  </Step>
+  
+  <Step title="Track Performance">
+    Monitor engagement rates and optimize content strategy
+  </Step>
+</Steps>
+
+## Requirements
+
+<Warning>
+Twitter Hand requires a Twitter/X Developer account and API access.
+</Warning>
+
+### Twitter API Setup
+
+<Steps>
+  <Step title="Create Developer Account">
+    Go to [developer.twitter.com](https://developer.twitter.com) and sign up
+  </Step>
+  
+  <Step title="Create Project & App">
+    Create a new Project and App in the Developer Portal (free tier works)
+  </Step>
+  
+  <Step title="Generate Bearer Token">
+    Navigate to your App's "Keys and tokens" page and generate a Bearer Token
+  </Step>
+  
+  <Step title="Set Environment Variable">
+    ```bash
+    export TWITTER_BEARER_TOKEN=your_token_here
+    ```
+  </Step>
+  
+  <Step title="Restart OpenFang">
+    Reload config for the token to take effect
+  </Step>
+</Steps>
+
+**Estimated setup time:** 5-10 minutes
+
+## Configuration
+
+### Content Settings
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Content Style** | `professional`, `casual`, `witty`, `educational`, `provocative`, `inspirational` | Voice and tone |
+| **Content Topics** | Comma-separated | Topics to tweet about (e.g., "AI, startups, productivity") |
+| **Brand Voice** | Free text | Describe your unique voice (e.g., "sarcastic founder who simplifies complex tech") |
+| **Thread Mode** | Toggle | Include multi-tweet threads in content mix |
+
+### Posting Schedule
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Post Frequency** | `1_daily`, `3_daily`, `5_daily`, `hourly` | How often to post |
+| **Content Queue Size** | 5, 10, 20, 50 | Number of tweets to keep ready |
+| **Approval Mode** | Toggle (default: ON) | Review before posting vs auto-post |
+
+<Note>
+**Approval mode is ON by default** for safety. Tweets are written to a queue file for your review instead of posting automatically.
+</Note>
+
+### Engagement Settings
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Auto Reply** | Toggle | Automatically reply to mentions |
+| **Auto Like** | Toggle | Like tweets from your network |
+| **Engagement Hours** | `business_hours`, `waking_hours`, `all_day` | When to check for engagement |
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate twitter
+```
+
+Configure your voice and topics:
+
+```bash
+openfang hand config twitter \
+  --set content_style="witty" \
+  --set content_topics="AI agents, automation, productivity" \
+  --set brand_voice="Technical founder who makes AI accessible with humor" \
+  --set post_frequency="3_daily" \
+  --set approval_mode="true"
+```
+
+### Example Workflow
+
+```
+Style: Witty
+Topics: AI agents, automation, productivity
+Frequency: 3 tweets per day (8 AM, 12 PM, 5 PM)
+Mode: Approval (queue for review)
+
+> Generate 10 tweets about AI agent trends
+```
+
+Twitter Hand will:
+1. Research trending AI agent topics
+2. Generate 10 tweets in witty style
+3. Write to `twitter_queue.json`
+4. Create human-readable `twitter_queue_preview.md`
+5. Notify you that queue is ready for review
+6. Wait for your approval to post
+
+## How It Works
+
+### 1. API Initialization
+
+Verifies Twitter API access:
+
+```bash
+curl -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  "https://api.twitter.com/2/users/me"
+```
+
+Extracts your `user_id` and `username` for later API calls.
+
+### 2. Content Research
+
+Before generating content:
+
+**Trend analysis:**
+```javascript
+web_search("AI agents trending today")
+web_search("productivity latest news")
+web_search("automation viral tweets") // for format inspiration only
+```
+
+**Performance analysis:**
+```bash
+curl -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  "https://api.twitter.com/2/tweets/search/recent?query=AI%20agents&max_results=10&tweet.fields=public_metrics"
+```
+
+Identifies:
+- What's trending in your topics
+- Content gaps (what's NOT being said)
+- High-performing tweet formats
+
+### 3. Content Generation
+
+**7 content types in rotation:**
+
+| Type | Description | Example |
+|------|-------------|----------|
+| **Hot take** | Strong opinion on trending topic | "Unpopular opinion: Most 'AI agents' are just chatbots with extra steps" |
+| **Thread** | Deep dive (3-10 tweets) | "Why agent frameworks are about to eat traditional SaaS 🧵" |
+| **Tip/How-to** | Actionable advice | "Build your first AI agent in 5 lines of Python:..." |
+| **Question** | Engagement driver | "What's the hardest part of building AI agents? 🤔" |
+| **Curated share** | Link + insight | "This article on ReAct agents is 🔥 [link] Key insight:..." |
+| **Story/Anecdote** | Personal narrative | "I spent 6 months building agents. Here's what I learned..." |
+| **Data/Stat** | Interesting data + commentary | "AI agent API calls grew 400% in Q1. This changes everything because..." |
+
+**Style adaptation:**
+
+```javascript
+// Professional style
+"AI agents represent a fundamental shift in how we interact with software systems."
+
+// Casual style
+"ngl ai agents are kinda wild when you see them in action 🤖"
+
+// Witty style
+"AI agents are like interns who never sleep, complain, or ask for equity. Perfect."
+
+// Educational style
+"Let's break down how AI agents work:
+1. LLM generates plan
+2. Tools execute actions
+3. Results feed back
+4. Repeat until done"
+
+// Provocative style
+"Hot take: If your 'AI agent' can't handle failures, it's not an agent — it's a script."
+
+// Inspirational style
+"Imagine a world where every repetitive task runs itself. We're building that future. ✨"
+```
+
+**Tweet rules:**
+- 280 characters max (hard limit)
+- Front-load hook (first line grabs attention)
+- Use line breaks for readability
+- 0-2 hashtags max (avoid spam)
+- Threads: first tweet must stand alone
+
+### 4. Content Queue
+
+If `approval_mode = true` (default):
+
+**Queue file (`twitter_queue.json`):**
+```json
+[
+  {
+    "id": "q_001",
+    "content": "Unpopular opinion: Most 'AI agents' are just chatbots with extra steps.\n\nReal agents:\n• Plan multi-step workflows\n• Use tools autonomously\n• Recover from failures\n
+Chatbots with function calling aren't agents. They're assistants.\n\nThe bar is higher.",
+    "type": "hot_take",
+    "created": "2026-03-06T10:30:00Z",
+    "status": "pending"
+  },
+  {
+    "id": "q_002",
+    "content": "Build your first AI agent in 5 lines of Python:\n\n```python\nfrom anthropic import Anthropic\nclient = Anthropic()\nresponse = client.messages.create(\n  model='claude-3-5-sonnet',\n  tools=[calculator, web_search],\n  messages=[{'role': 'user', 'content': 'Research AI trends'}]\n)\n```\n\nThat's it. Claude handles the rest.",
+    "type": "tip",
+    "created": "2026-03-06T10:31:00Z",
+    "status": "pending"
+  }
+]
+```
+
+**Preview file (`twitter_queue_preview.md`):**
+```markdown
+# Twitter Queue — 10 tweets ready
+
+## Tweet 1 (Hot take)
+Unpopular opinion: Most 'AI agents' are just chatbots with extra steps.
+
+Real agents:
+• Plan multi-step workflows
+• Use tools autonomously
+• Recover from failures
+
+Chatbots with function calling aren't agents. They're assistants.
+
+The bar is higher.
+
+---
+
+## Tweet 2 (Tip)
+Build your first AI agent in 5 lines of Python:
+
+```python
+from anthropic import Anthropic
+...
+```
+
+---
+
+[... 8 more tweets ...]
+```
+
+To approve and post:
+1. Review `twitter_queue_preview.md`
+2. Edit if needed
+3. Tell Twitter Hand: "Post the queue" or "Post tweet #1"
+
+### 5. Posting (Manual Approval or Auto)
+
+If approved:
+
+**Post a tweet:**
+```bash
+curl -X POST "https://api.twitter.com/2/tweets" \
+  -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "tweet content here"}'
+```
+
+**Post a thread:**
+```bash
+# Tweet 1
+curl -X POST "https://api.twitter.com/2/tweets" \
+  -d '{"text": "Thread hook tweet"}' \
+  -o response1.json
+
+# Extract tweet_id from response1.json
+FIRST_ID=$(jq -r '.data.id' response1.json)
+
+# Tweet 2 (reply to tweet 1)
+curl -X POST "https://api.twitter.com/2/tweets" \
+  -d '{"text": "Thread continuation", "reply": {"in_reply_to_tweet_id": "'$FIRST_ID'"}}' \
+  -o response2.json
+
+# Repeat for remaining tweets in thread
+```
+
+**Rate limits:** Twitter API allows 300 tweets per 3 hours. Twitter Hand respects this automatically.
+
+Logs each posted tweet to `twitter_posted.json`:
+```json
+{
+  "id": "1234567890",
+  "text": "...",
+  "posted_at": "2026-03-06T12:00:00Z",
+  "type": "hot_take",
+  "metrics": null // updated later
+}
+```
+
+### 6. Engagement
+
+If `auto_reply` or `auto_like` enabled:
+
+**Check mentions:**
+```bash
+curl -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  "https://api.twitter.com/2/users/$USER_ID/mentions?max_results=10&tweet.fields=created_at"
+```
+
+**Generate reply** (if auto_reply enabled):
+```javascript
+// Mention: "@you What's the best agent framework?"
+// Generated reply (matching your style):
+"Great question! For production, I'd go with LangGraph (flexibility) or Claude's native tool use (simplicity). Depends if you need complex workflows or straightforward tasks."
+```
+
+In approval mode, replies go to queue. Otherwise, posted directly.
+
+**Auto-like** (if enabled):
+```bash
+curl -X POST "https://api.twitter.com/2/users/$USER_ID/likes" \
+  -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  -d '{"tweet_id": "1234567890"}'
+```
+
+Like tweets from:
+- People who engage with you
+- Relevant content in your topics
+
+Max 50 likes per cycle (avoid rate limits).
+
+<Warning>
+**Twitter Hand NEVER:**
+- Argues with trolls
+- Engages with toxic accounts
+- Posts defamatory or harmful content
+- Impersonates others
+- Violates Twitter Terms of Service
+</Warning>
+
+### 7. Performance Tracking
+
+Fetch metrics for recent tweets:
+
+```bash
+curl -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
+  "https://api.twitter.com/2/tweets?ids=ID1,ID2,ID3&tweet.fields=public_metrics"
+```
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "1234567890",
+      "text": "...",
+      "public_metrics": {
+        "retweet_count": 12,
+        "reply_count": 8,
+        "like_count": 45,
+        "quote_count": 3,
+        "bookmark_count": 7,
+        "impression_count": 2341
+      }
+    }
+  ]
+}
+```
+
+**Analyze patterns:**
+- Which content types perform best?
+- Which posting times get most engagement?
+- Which topics resonate most?
+
+Stores insights in knowledge graph for future content optimization.
+
+## Output
+
+| File | Description |
+|------|-------------|
+| `twitter_queue.json` | Pending tweets (JSON) |
+| `twitter_queue_preview.md` | Human-readable queue |
+| `twitter_posted.json` | Posting history with metrics |
+
+## Dashboard Metrics
+
+- **Tweets Posted** — Total tweets published
+- **Replies Sent** — Total engagement replies
+- **Queue Size** — Current queue size
+- **Engagement Rate** — Average engagement rate
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Start with approval mode ON — review quality before auto-posting
+- Be specific with `brand_voice` — "Technical founder" is better than "professional"
+- Mix content types — all hot takes or all threads gets stale
+- Review performance weekly — refine topics based on what works
+- Keep queue size at 10-20 for flexibility
+</Note>
+
+### Common Issues
+
+**"Unauthorized error"**  
+Check your Bearer Token: `echo $TWITTER_BEARER_TOKEN`  
+Regenerate if needed via Developer Portal.
+
+**"Rate limit exceeded"**  
+Twitter limits 300 tweets per 3 hours. Twitter Hand respects this, but manual posting can hit limits.
+
+**"Tweets lack personality"**  
+Be more specific in `brand_voice`. Instead of "professional," try "CTO who explains AI like teaching a 5-year-old, with occasional sarcasm."
+
+**"Low engagement"**  
+Check performance metrics. Try different content types, posting times, or topics. Engagement takes time to build.
+
+## Advanced Usage
+
+### On-Demand Content
+
+```
+Generate 5 tweets about [breaking news topic]
+```
+
+### Thread Deep-Dives
+
+```
+Write a 10-tweet thread explaining AI agent architectures for developers
+```
+
+### Reply to Specific Tweet
+
+```
+Reply to this mention with a helpful response: [tweet URL or text]
+```
+
+### Performance Analysis
+
+```
+Analyze my tweet performance from the last month. What's working?
+```
+
+### Export Content Calendar
+
+```bash
+cat twitter_queue.json | jq -r '.[] | "\(.created): \(.content)"'
+```
+
+## Safety & Guidelines
+
+<Warning>
+**Important safety rules:**
+
+- Approval mode is ON by default for good reason — AI can make mistakes
+- Review tweets before posting to large audiences
+- Never store passwords or API keys in tweets
+- Don't post private information about anyone
+- Block/ignore trolls — never engage negatively
+- Respect Twitter's automation rules and rate limits
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Clip Hand" icon="film" href="/hands/clip">
+    Create video clips to share on Twitter
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Research trending topics for tweet content
+  </Card>
+</CardGroup>

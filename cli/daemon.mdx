@@ -1,0 +1,539 @@
+---
+title: Daemon Management
+description: Start, stop, and manage the OpenFang kernel daemon
+---
+
+# Daemon Management
+
+The OpenFang daemon is the core service that runs the kernel, manages agents, and provides the HTTP API and web dashboard.
+
+## Starting the Daemon
+
+### openfang start
+
+Start the OpenFang daemon (kernel + API server).
+
+```bash
+openfang start [--config <PATH>]
+```
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--config <PATH>` | Path to a custom config file (overrides `~/.openfang/config.toml`) |
+
+**Behavior:**
+
+1. Checks if a daemon is already running; exits with an error if so
+2. Boots the OpenFang kernel:
+   - Loads configuration from `~/.openfang/config.toml`
+   - Initializes SQLite database
+   - Loads persisted agents
+   - Connects to configured MCP servers
+   - Starts background tasks
+3. Starts the HTTP API server on the configured address (default: `127.0.0.1:4200`)
+4. Writes `daemon.json` to `~/.openfang/` for daemon discovery
+5. Blocks until interrupted with `Ctrl+C`
+
+**Example Output:**
+
+```bash
+$ openfang start
+
+  OpenFang Agent OS v0.1.0
+
+  Starting daemon...
+
+  [ok] Kernel booted (groq/llama-3.3-70b-versatile)
+  [ok] 50 models available
+  [ok] 3 agent(s) loaded
+
+  API:        http://127.0.0.1:4200
+  Dashboard:  http://127.0.0.1:4200/
+  Provider:   groq
+  Model:      llama-3.3-70b-versatile
+
+  hint: Open the dashboard in your browser, or run `openfang chat`
+  hint: Press Ctrl+C to stop the daemon
+```
+
+<Note>
+  The daemon runs in the foreground by default. For background operation, use a process manager like `systemd`, `pm2`, or run in a `screen`/`tmux` session.
+</Note>
+
+### Starting with Custom Config
+
+```bash
+openfang start --config /path/to/custom-config.toml
+```
+
+### Docker Configuration
+
+When running in Docker, bind to `0.0.0.0` to allow external connections:
+
+```toml
+# config.toml
+api_listen = "0.0.0.0:4200"
+```
+
+Or use the environment variable:
+
+```bash
+OPENFANG_LISTEN=0.0.0.0:4200 openfang start
+```
+
+## Stopping the Daemon
+
+### openfang stop
+
+Stop the running daemon gracefully.
+
+```bash
+openfang stop
+```
+
+**Behavior:**
+
+1. Reads `daemon.json` to locate the daemon
+2. Sends `POST /api/shutdown` to the daemon
+3. Waits up to 5 seconds for graceful shutdown
+4. If daemon doesn't stop, force-kills via PID
+5. Removes `daemon.json`
+
+**Example Output:**
+
+```bash
+$ openfang stop
+[ok] Daemon stopped
+```
+
+<Warning>
+  If the daemon doesn't respond within 5 seconds, it will be force-killed using `kill -9` (Unix) or `taskkill /F` (Windows).
+</Warning>
+
+### Stopping from the Same Terminal
+
+If you started the daemon in the foreground, simply press `Ctrl+C`:
+
+```bash
+$ openfang start
+# ... daemon running ...
+^C
+  OpenFang daemon stopped.
+```
+
+## Checking Daemon Status
+
+### openfang status
+
+Show the current kernel/daemon status.
+
+```bash
+openfang status [--json]
+```
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--json` | Output machine-readable JSON for scripting |
+
+**Behavior:**
+
+- **If daemon is running**: Queries `GET /api/status` and displays:
+  - Agent count
+  - Provider and model
+  - Uptime
+  - API URL
+  - Data directory
+  - List of active agents
+
+- **If no daemon is running**: Boots an in-process kernel and shows persisted state with a warning
+
+**Example Output (Daemon Running):**
+
+```bash
+$ openfang status
+
+  OpenFang Status
+
+  Daemon:     running
+  API:        http://127.0.0.1:4200
+  Provider:   groq
+  Model:      llama-3.3-70b-versatile
+  Agents:     3
+  Uptime:     2h 15m
+  Data:       ~/.openfang/
+
+  Active Agents:
+  - coder (a1b2c3d4-...)
+  - assistant (e5f6g7h8-...)
+  - researcher (i9j0k1l2-...)
+```
+
+**Example Output (No Daemon):**
+
+```bash
+$ openfang status
+
+  [!] Warning: Daemon is not running
+  hint: Start it with: openfang start
+
+  Showing persisted state:
+  Provider:   groq
+  Model:      llama-3.3-70b-versatile
+  Agents:     3 (not running)
+```
+
+### JSON Output
+
+```bash
+$ openfang status --json
+{
+  "daemon_running": true,
+  "api_url": "http://127.0.0.1:4200",
+  "provider": "groq",
+  "model": "llama-3.3-70b-versatile",
+  "agent_count": 3,
+  "uptime_seconds": 8100,
+  "data_dir": "/home/user/.openfang",
+  "agents": [
+    {"id": "a1b2c3d4-...", "name": "coder", "state": "idle"},
+    {"id": "e5f6g7h8-...", "name": "assistant", "state": "processing"},
+    {"id": "i9j0k1l2-...", "name": "researcher", "state": "idle"}
+  ]
+}
+```
+
+**Scripting with JSON:**
+
+```bash
+# Check if daemon is running
+if openfang status --json | jq -e '.daemon_running' > /dev/null; then
+  echo "Daemon is up"
+fi
+
+# Get agent count
+AGENT_COUNT=$(openfang status --json | jq '.agent_count')
+echo "Running agents: $AGENT_COUNT"
+```
+
+## Health Checks
+
+### openfang health
+
+Quick daemon health check.
+
+```bash
+openfang health [--json]
+```
+
+**Example Output:**
+
+```bash
+$ openfang health
+[ok] Daemon is healthy
+API: http://127.0.0.1:4200
+```
+
+**JSON Output:**
+
+```bash
+$ openfang health --json
+{"status": "healthy", "api_url": "http://127.0.0.1:4200"}
+```
+
+<Note>
+  `openfang health` performs a lightweight check (just the HTTP health endpoint), while `openfang status` provides comprehensive system information.
+</Note>
+
+## Diagnostic Checks
+
+### openfang doctor
+
+Run comprehensive diagnostic checks on the OpenFang installation.
+
+```bash
+openfang doctor [--json] [--repair]
+```
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--json` | Output results as JSON for scripting |
+| `--repair` | Attempt to auto-fix issues (prompts for confirmation) |
+
+**Checks Performed:**
+
+1. **OpenFang directory** - `~/.openfang/` exists
+2. **.env file** - exists and has correct permissions (0600 on Unix)
+3. **Config TOML syntax** - `config.toml` parses without errors
+4. **Daemon status** - whether a daemon is running
+5. **Port availability** - if daemon is not running, checks if port 4200 is free
+6. **Stale daemon.json** - leftover file from a crashed daemon
+7. **Database file** - SQLite magic bytes validation
+8. **Disk space** - warns if less than 100MB available (Unix only)
+9. **Agent manifests** - validates all `.toml` files in `~/.openfang/agents/`
+10. **LLM provider keys** - checks env vars for all providers, performs live validation
+11. **Channel tokens** - format validation for Telegram, Discord, Slack tokens
+12. **Config consistency** - checks that `api_key_env` references match actual env vars
+13. **Rust toolchain** - `rustc --version`
+
+**Example Output:**
+
+```bash
+$ openfang doctor
+
+  OpenFang Diagnostics
+
+  [ok] OpenFang directory exists
+  [ok] .env file exists (permissions: 0600)
+  [ok] config.toml syntax is valid
+  [ok] Daemon is running (http://127.0.0.1:4200)
+  [ok] Database file is valid
+  [ok] 125GB disk space available
+  [ok] 3 agent manifests validated
+  [ok] GROQ_API_KEY: valid
+  [warn] ANTHROPIC_API_KEY: not set
+  [ok] Telegram token format valid
+  [ok] Config references match environment
+  [ok] Rust 1.75.0
+
+  Summary: 11 checks passed, 1 warning
+```
+
+### Auto-Repair Mode
+
+```bash
+$ openfang doctor --repair
+
+  OpenFang Diagnostics
+
+  [!] OpenFang directory missing
+  [?] Create ~/.openfang/? (y/n): y
+  [ok] Created ~/.openfang/
+
+  [!] Stale daemon.json detected (PID 1234 not running)
+  [?] Remove daemon.json? (y/n): y
+  [ok] Removed stale daemon.json
+
+  [ok] Database file is valid
+  ...
+```
+
+<Warning>
+  `--repair` mode will prompt before making any changes. It can create missing directories, remove stale files, and fix file permissions.
+</Warning>
+
+## Gateway Commands
+
+The `gateway` subcommand provides an alternative interface to daemon management:
+
+```bash
+openfang gateway start    # Same as: openfang start
+openfang gateway stop     # Same as: openfang stop
+openfang gateway status   # Same as: openfang status
+```
+
+## Dashboard Access
+
+### openfang dashboard
+
+Open the web dashboard in the default browser.
+
+```bash
+openfang dashboard
+```
+
+**Behavior:**
+
+1. Requires a running daemon
+2. Opens the daemon URL (e.g. `http://127.0.0.1:4200/`) in the system browser
+3. Copies the URL to the system clipboard
+
+**Example Output:**
+
+```bash
+$ openfang dashboard
+[ok] Opening dashboard at http://127.0.0.1:4200/
+[ok] URL copied to clipboard
+```
+
+<Note>
+  The dashboard is an Alpine.js single-page application served directly by the daemon.
+</Note>
+
+## Daemon Auto-Detection Details
+
+The CLI uses a two-step mechanism to detect a running daemon:
+
+### Step 1: Read daemon.json
+
+On startup, the daemon writes `~/.openfang/daemon.json`:
+
+```json
+{
+  "listen_addr": "127.0.0.1:4200",
+  "pid": 12345,
+  "started_at": "2025-03-06T10:30:00Z"
+}
+```
+
+The CLI reads this file to discover the daemon's listen address.
+
+### Step 2: Health Check
+
+The CLI sends `GET http://<listen_addr>/api/health` with a 2-second timeout:
+
+```bash
+$ curl -s http://127.0.0.1:4200/api/health
+{"status":"ok"}
+```
+
+If the health check succeeds, the daemon is considered running.
+
+### Fallback to In-Process Mode
+
+If either step fails (no `daemon.json`, stale file, health check timeout), the CLI falls back to in-process mode for commands that support it.
+
+Commands that **require** a daemon:
+- `workflow` commands
+- `trigger` commands
+- `channel test/enable/disable`
+- `dashboard`
+
+These will exit with an error and a helpful message if no daemon is found.
+
+## Troubleshooting
+
+### Daemon Won't Start
+
+**Port Already in Use:**
+
+```bash
+$ openfang start
+[!] Error: Address already in use (port 4200)
+hint: Another process is using port 4200. Check with: lsof -i :4200
+```
+
+Solutions:
+- Kill the process using port 4200
+- Change the port in `config.toml`: `api_listen = "127.0.0.1:4201"`
+
+**Database Locked:**
+
+```bash
+$ openfang start
+[!] Error: Database is locked
+hint: Another OpenFang instance may be running
+```
+
+Solutions:
+- Check for other OpenFang processes: `ps aux | grep openfang`
+- Remove stale lock: `rm ~/.openfang/data/openfang.db-shm`
+
+**Config Parse Error:**
+
+```bash
+$ openfang start
+[!] Error: Failed to parse configuration
+hint: Check your config.toml syntax: openfang config show
+```
+
+Solutions:
+- Validate TOML syntax with `openfang doctor`
+- Restore default config: `rm ~/.openfang/config.toml && openfang init --quick`
+
+### Daemon Won't Stop
+
+```bash
+$ openfang stop
+[!] Daemon did not respond, force-killing...
+[ok] Daemon stopped (forced)
+```
+
+This happens when the daemon is unresponsive. The CLI will automatically force-kill it.
+
+### Stale daemon.json
+
+If the daemon crashes, `daemon.json` may be left behind:
+
+```bash
+$ openfang doctor --repair
+[!] Stale daemon.json detected (PID 1234 not running)
+[?] Remove daemon.json? (y/n): y
+[ok] Removed stale daemon.json
+```
+
+## Production Deployment
+
+### Systemd Service (Linux)
+
+Create `/etc/systemd/system/openfang.service`:
+
+```ini
+[Unit]
+Description=OpenFang Agent OS
+After=network.target
+
+[Service]
+Type=simple
+User=openfang
+WorkingDirectory=/home/openfang
+Environment="GROQ_API_KEY=gsk_..."
+ExecStart=/usr/local/bin/openfang start
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable openfang
+sudo systemctl start openfang
+sudo systemctl status openfang
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  openfang:
+    image: openfang/openfang:latest
+    environment:
+      - GROQ_API_KEY=gsk_...
+      - OPENFANG_LISTEN=0.0.0.0:4200
+    ports:
+      - "4200:4200"
+    volumes:
+      - openfang-data:/home/openfang/.openfang
+    restart: unless-stopped
+
+volumes:
+  openfang-data:
+```
+
+### PM2 (Node.js Process Manager)
+
+```bash
+pm2 start openfang --name openfang-daemon -- start
+pm2 save
+pm2 startup
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Commands" icon="robot" href="/cli/agent-commands">
+    Learn how to create and manage agents
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure providers, models, and channels
+  </Card>
+</CardGroup>

@@ -1,0 +1,157 @@
+---
+title: 'API Overview'
+description: 'Introduction to the OpenFang REST API'
+---
+
+## Base URL
+
+The OpenFang API runs on your local machine by default:
+
+```
+http://127.0.0.1:4200
+```
+
+The base URL can be configured via the `api_listen` setting in `~/.openfang/config.toml`.
+
+## API Architecture
+
+OpenFang exposes a RESTful HTTP API for managing agents, workflows, memory, and system configuration. The API is built with:
+
+- **Axum** web framework
+- **JSON** request/response format
+- **Server-Sent Events (SSE)** for streaming responses
+- **WebSocket** for real-time agent communication
+
+## Core Resources
+
+<CardGroup cols={2}>
+  <Card title="Agents" icon="robot" href="/api/agents">
+    Spawn, manage, and communicate with AI agents
+  </Card>
+  <Card title="Memory" icon="brain" href="/api/memory">
+    Semantic memory, knowledge graphs, and key-value storage
+  </Card>
+  <Card title="Workflows" icon="sitemap" href="/api/workflows">
+    Multi-agent pipelines and orchestration
+  </Card>
+  <Card title="Models" icon="microchip" href="/api/models">
+    Model catalog, providers, and cost tracking
+  </Card>
+  <Card title="Channels" icon="comments" href="/api/channels">
+    Connect to Telegram, Discord, Slack, and 40+ platforms
+  </Card>
+</CardGroup>
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes:
+
+| Code | Description |
+|------|-------------|
+| `200` | Success |
+| `201` | Created (resource spawned) |
+| `400` | Bad Request (invalid input) |
+| `401` | Unauthorized (invalid API key) |
+| `403` | Forbidden (signature verification failed) |
+| `404` | Not Found (agent/resource doesn't exist) |
+| `413` | Payload Too Large (message/manifest exceeds limit) |
+| `429` | Too Many Requests (rate limit exceeded or quota reached) |
+| `500` | Internal Server Error |
+
+## Rate Limiting
+
+The API implements GCRA (Generic Cell Rate Algorithm) rate limiting:
+
+- **Default limit**: 30 requests per second per IP
+- **Response headers**: `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- **Status**: Returns `429 Too Many Requests` when exceeded
+
+## CORS
+
+When no API key is configured, CORS is restricted to localhost origins:
+- `http://127.0.0.1:<port>`
+- `http://localhost:<port>`
+- Common dev ports: 3000, 8080
+
+With an API key configured, CORS allows the configured origins plus localhost.
+
+## Health Check
+
+```bash
+curl http://127.0.0.1:4200/api/health
+```
+
+<ResponseExample>
+```json
+{
+  "status": "healthy"
+}
+```
+</ResponseExample>
+
+## Version Info
+
+```bash
+curl http://127.0.0.1:4200/api/version
+```
+
+<ResponseExample>
+```json
+{
+  "name": "openfang",
+  "version": "0.1.0",
+  "build_date": "2025-03-06",
+  "git_sha": "a1b2c3d",
+  "rust_version": "1.83.0",
+  "platform": "linux",
+  "arch": "x86_64"
+}
+```
+</ResponseExample>
+
+## System Status
+
+Get comprehensive kernel status including agents, uptime, and configuration:
+
+```bash
+curl http://127.0.0.1:4200/api/status
+```
+
+<ResponseExample>
+```json
+{
+  "status": "running",
+  "agent_count": 3,
+  "default_provider": "anthropic",
+  "default_model": "claude-sonnet-4-20250514",
+  "uptime_seconds": 86400,
+  "api_listen": "127.0.0.1:4200",
+  "home_dir": "/home/user/.openfang",
+  "log_level": "info",
+  "network_enabled": false,
+  "agents": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "assistant",
+      "state": "Running",
+      "mode": "Auto",
+      "created_at": "2025-03-06T12:00:00Z",
+      "model_provider": "anthropic",
+      "model_name": "claude-sonnet-4-20250514",
+      "profile": "Full"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Secure your API with Bearer tokens
+  </Card>
+  <Card title="Agents" icon="robot" href="/api/agents">
+    Start spawning and managing agents
+  </Card>
+</CardGroup>

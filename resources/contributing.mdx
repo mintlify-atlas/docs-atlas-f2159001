@@ -1,0 +1,468 @@
+---
+title: 'Contributing'
+description: 'How to contribute to OpenFang - from setting up your dev environment to submitting PRs'
+icon: 'code-pull-request'
+---
+
+Thank you for your interest in contributing to OpenFang. This guide covers everything you need to get started, from setting up your development environment to submitting pull requests.
+
+## Development Environment
+
+### Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Rust 1.75+" icon="rust">
+    Install via [rustup](https://rustup.rs/)
+  </Card>
+  <Card title="Git" icon="git">
+    Version control for source code
+  </Card>
+  <Card title="Python 3.8+" icon="python">
+    Optional, for Python runtime and skills
+  </Card>
+  <Card title="LLM API Key" icon="key">
+    For end-to-end testing (Groq, OpenAI, Anthropic)
+  </Card>
+</CardGroup>
+
+### Clone and Build
+
+```bash
+git clone https://github.com/RightNow-AI/openfang.git
+cd openfang
+cargo build
+```
+
+<Note>
+  The first build takes a few minutes because it compiles SQLite (bundled) and Wasmtime. Subsequent builds are incremental.
+</Note>
+
+### Environment Variables
+
+For running integration tests that hit a real LLM, set at least one provider key:
+
+```bash
+export GROQ_API_KEY=gsk_...          # Recommended for fast, free-tier testing
+export ANTHROPIC_API_KEY=sk-ant-...  # For Anthropic-specific tests
+```
+
+<Note>
+  Tests that require a real LLM key will skip gracefully if the env var is absent.
+</Note>
+
+## Building and Testing
+
+### Build the Entire Workspace
+
+```bash
+cargo build --workspace
+```
+
+### Run All Tests
+
+```bash
+cargo test --workspace
+```
+
+<Warning>
+  The test suite is currently 1,744+ tests. All must pass before merging.
+</Warning>
+
+### Run Tests for a Single Crate
+
+```bash
+cargo test -p openfang-kernel
+cargo test -p openfang-runtime
+cargo test -p openfang-memory
+```
+
+### Check for Clippy Warnings
+
+```bash
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+<Note>
+  The CI pipeline enforces zero clippy warnings.
+</Note>
+
+### Format Code
+
+```bash
+cargo fmt --all
+```
+
+<Warning>
+  Always run `cargo fmt` before committing. CI will reject unformatted code.
+</Warning>
+
+### Run the Doctor Check
+
+After building, verify your local setup:
+
+```bash
+cargo run -- doctor
+```
+
+## Code Style
+
+### Formatting
+- Use `rustfmt` with default settings
+- Run `cargo fmt --all` before every commit
+
+### Linting
+- `cargo clippy --workspace -- -D warnings` must pass with zero warnings
+
+### Documentation
+- All public types and functions must have doc comments (`///`)
+
+### Error Handling
+- Use `thiserror` for error types
+- Avoid `unwrap()` in library code; prefer `?` propagation
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|----------|
+| Types | PascalCase | `OpenFangKernel`, `AgentManifest` |
+| Functions/methods | snake_case | `spawn_agent`, `get_status` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRIES`, `DEFAULT_PORT` |
+| Crate names | kebab-case | `openfang-kernel`, `openfang-api` |
+
+### Dependencies
+
+<Note>
+  Workspace dependencies are declared in the root `Cargo.toml`. Prefer reusing workspace deps over adding new ones. If you need a new dependency, justify it in the PR.
+</Note>
+
+### Testing
+
+- Every new feature must include tests
+- Use `tempfile::TempDir` for filesystem isolation
+- Use random port binding for network tests
+
+### Serde
+
+- All config structs use `#[serde(default)]` for forward compatibility with partial TOML
+
+## Architecture Overview
+
+OpenFang is organized as a Cargo workspace with 14 crates:
+
+<Accordion title="openfang-types">
+  Shared type definitions, taint tracking, manifest signing (Ed25519), model catalog, MCP/A2A config types
+</Accordion>
+
+<Accordion title="openfang-memory">
+  SQLite-backed memory substrate with vector embeddings, usage tracking, canonical sessions, JSONL mirroring
+</Accordion>
+
+<Accordion title="openfang-runtime">
+  Agent loop, 3 LLM drivers (Anthropic/Gemini/OpenAI-compat), 38 built-in tools, WASM sandbox, MCP client/server, A2A protocol
+</Accordion>
+
+<Accordion title="openfang-hands">
+  Hands system (curated autonomous capability packages), 7 bundled hands
+</Accordion>
+
+<Accordion title="openfang-extensions">
+  Integration registry (25 bundled MCP templates), AES-256-GCM credential vault, OAuth2 PKCE
+</Accordion>
+
+<Accordion title="openfang-kernel">
+  Assembles all subsystems: workflow engine, RBAC auth, heartbeat monitor, cron scheduler, config hot-reload
+</Accordion>
+
+<Accordion title="openfang-api">
+  REST/WS/SSE API (Axum 0.8), 76 endpoints, 14-page SPA dashboard, OpenAI-compatible `/v1/chat/completions`
+</Accordion>
+
+<Accordion title="openfang-channels">
+  40 channel adapters (Telegram, Discord, Slack, WhatsApp, and 36 more), formatter, rate limiter
+</Accordion>
+
+<Accordion title="openfang-wire">
+  OFP (OpenFang Protocol): TCP P2P networking with HMAC-SHA256 mutual authentication
+</Accordion>
+
+<Accordion title="openfang-cli">
+  Clap CLI with daemon auto-detect (HTTP mode vs. in-process fallback), MCP server
+</Accordion>
+
+<Accordion title="openfang-migrate">
+  Migration engine for importing from OpenClaw (and future frameworks)
+</Accordion>
+
+<Accordion title="openfang-skills">
+  Skill system: 60 bundled skills, FangHub marketplace, OpenClaw compatibility, prompt injection scanning
+</Accordion>
+
+<Accordion title="openfang-desktop">
+  Tauri 2.0 native desktop app (WebView + system tray + single-instance + notifications)
+</Accordion>
+
+<Accordion title="xtask">
+  Build automation tasks
+</Accordion>
+
+### Key Architectural Patterns
+
+<Note>
+  **`KernelHandle` trait**: Defined in `openfang-runtime`, implemented on `OpenFangKernel` in `openfang-kernel`. This avoids circular crate dependencies while enabling inter-agent tools.
+</Note>
+
+<Note>
+  **Shared memory**: A fixed UUID (`AgentId(Uuid::from_bytes([0..0, 0x01]))`) provides a cross-agent KV namespace.
+</Note>
+
+<Note>
+  **Daemon detection**: The CLI checks `~/.openfang/daemon.json` and pings the health endpoint. If a daemon is running, commands use HTTP; otherwise, they boot an in-process kernel.
+</Note>
+
+<Note>
+  **Capability-based security**: Every agent operation is checked against the agent's granted capabilities before execution.
+</Note>
+
+## How to Add a New Agent Template
+
+Agent templates live in the `agents/` directory. Each template is a folder containing an `agent.toml` manifest.
+
+### Steps
+
+1. Create a new directory under `agents/`:
+
+```
+agents/my-agent/agent.toml
+```
+
+2. Write the manifest:
+
+```toml
+name = "my-agent"
+version = "0.1.0"
+description = "A brief description of what this agent does."
+author = "openfang"
+module = "builtin:chat"
+tags = ["category"]
+
+[model]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+
+[resources]
+max_llm_tokens_per_hour = 100000
+
+[capabilities]
+tools = ["file_read", "file_list", "web_fetch"]
+memory_read = ["*"]
+memory_write = ["self.*"]
+agent_spawn = false
+```
+
+3. Include a system prompt if needed by adding it to the `[model]` section:
+
+```toml
+[model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+system_prompt = """
+You are a specialized agent that...
+"""
+```
+
+4. Test by spawning:
+
+```bash
+openfang agent spawn agents/my-agent/agent.toml
+```
+
+5. Submit a PR with the new template.
+
+## How to Add a New Channel Adapter
+
+Channel adapters live in `crates/openfang-channels/src/`. Each adapter implements the `ChannelAdapter` trait.
+
+### Steps
+
+1. Create a new file: `crates/openfang-channels/src/myplatform.rs`
+
+2. Implement the `ChannelAdapter` trait:
+
+```rust
+use crate::types::{ChannelAdapter, ChannelMessage, ChannelType};
+use async_trait::async_trait;
+
+pub struct MyPlatformAdapter {
+    // token, client, config fields
+}
+
+#[async_trait]
+impl ChannelAdapter for MyPlatformAdapter {
+    fn channel_type(&self) -> ChannelType {
+        ChannelType::Custom("myplatform".to_string())
+    }
+
+    async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Start polling/listening for messages
+        Ok(())
+    }
+
+    async fn send(&self, channel_id: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Send a message back to the platform
+        Ok(())
+    }
+
+    async fn stop(&mut self) {
+        // Clean shutdown
+    }
+}
+```
+
+3. Register the module in `crates/openfang-channels/src/lib.rs`:
+
+```rust
+pub mod myplatform;
+```
+
+4. Wire it up in the channel bridge so the daemon starts it alongside other adapters.
+
+5. Add configuration support in `openfang-types` config structs.
+
+6. Add CLI setup wizard instructions.
+
+7. Write tests and submit a PR.
+
+## How to Add a New Tool
+
+Built-in tools are defined in `crates/openfang-runtime/src/tool_runner.rs`.
+
+### Steps
+
+1. Add the tool implementation function:
+
+```rust
+async fn tool_my_tool(input: &serde_json::Value) -> Result<String, String> {
+    let param = input["param"]
+        .as_str()
+        .ok_or("Missing 'param' field")?;
+
+    // Tool logic here
+    Ok(format!("Result: {param}"))
+}
+```
+
+2. Register it in the `execute_tool` match block:
+
+```rust
+"my_tool" => tool_my_tool(input).await,
+```
+
+3. Add the tool definition to `builtin_tool_definitions()`:
+
+```rust
+ToolDefinition {
+    name: "my_tool".to_string(),
+    description: "Description shown to the LLM.".to_string(),
+    input_schema: serde_json::json!({
+        "type": "object",
+        "properties": {
+            "param": {
+                "type": "string",
+                "description": "The parameter description"
+            }
+        },
+        "required": ["param"]
+    }),
+},
+```
+
+4. Agents that need the tool must list it in their manifest:
+
+```toml
+[capabilities]
+tools = ["my_tool"]
+```
+
+5. Write tests for the tool function.
+
+6. If the tool requires kernel access (e.g., inter-agent communication), accept `Option<&Arc<dyn KernelHandle>>` and handle the `None` case gracefully.
+
+## Pull Request Process
+
+### 1. Fork and Branch
+
+Create a feature branch from `main`. Use descriptive names:
+- `feat/add-matrix-adapter`
+- `fix/session-restore-crash`
+- `docs/improve-installation-guide`
+
+### 2. Make Your Changes
+
+Follow the code style guidelines above.
+
+### 3. Test Thoroughly
+
+<Warning>
+  All three checks must pass:
+</Warning>
+
+```bash
+cargo test --workspace                                      # All 1,744+ tests
+cargo clippy --workspace --all-targets -- -D warnings      # Zero warnings
+cargo fmt --all --check                                     # No diff
+```
+
+### 4. Write a Clear PR Description
+
+Explain what changed and why. Include before/after examples if applicable.
+
+### 5. One Concern per PR
+
+<Note>
+  Keep PRs focused. A single PR should address one feature, one bug fix, or one refactor - not all three.
+</Note>
+
+### 6. Review Process
+
+At least one maintainer must approve before merge. Address review feedback promptly.
+
+### 7. CI Must Pass
+
+All automated checks must be green before merge.
+
+## Commit Messages
+
+Use clear, imperative-mood messages:
+
+```
+Add Matrix channel adapter with E2EE support
+Fix session restore crash on kernel reboot
+Refactor capability manager to use DashMap
+```
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). By participating, you agree to uphold a welcoming, inclusive, and harassment-free environment for everyone.
+
+Please report unacceptable behavior to the maintainers.
+
+## Questions?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/RightNow-AI/openfang/discussions">
+    Ask questions and share ideas
+  </Card>
+  <Card title="GitHub Issues" icon="bug" href="https://github.com/RightNow-AI/openfang/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Discord" icon="discord" href="https://discord.gg/sSJqgNnq6X">
+    Chat with the community
+  </Card>
+  <Card title="Documentation" icon="book" href="https://openfang.sh/docs">
+    Read detailed guides
+  </Card>
+</CardGroup>
+
+<Note>
+  Thank you for contributing to OpenFang. Every contribution, no matter how small, helps make the project better for everyone.
+</Note>

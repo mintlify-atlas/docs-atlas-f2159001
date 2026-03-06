@@ -1,0 +1,768 @@
+---
+title: OpenAI Compatibility
+description: Use OpenFang as a drop-in replacement for the OpenAI API — point any OpenAI-compatible client library at OpenFang and talk directly to your agents
+---
+
+# OpenAI-Compatible Endpoints
+
+OpenFang implements the OpenAI `/v1/chat/completions` API, allowing any OpenAI-compatible client library to talk directly to your agents. Your agents become LLM endpoints that any tool, script, or application can use.
+
+<Note>
+All OpenAI-compatible endpoints are available at `http://127.0.0.1:4200/v1/` by default. Configure the port in `~/.openfang/config.toml`.
+</Note>
+
+## How It Works
+
+When you send a request to `/v1/chat/completions`, OpenFang:
+
+1. **Resolves the agent** — The `model` field maps to an agent by name, UUID, or `openfang:<name>` prefix
+2. **Converts messages** — OpenAI message format is converted to OpenFang's internal format
+3. **Executes the agent loop** — The agent processes your message with full tool access and multi-turn execution
+4. **Returns formatted response** — Response follows OpenAI's exact structure, including token usage
+
+This means your agents get all of OpenFang's capabilities (tools, memory, security, hands) while being accessible through the standard OpenAI API.
+
+## Authentication
+
+Currently, OpenFang's OpenAI-compatible endpoints do not require authentication when running locally. For production deployments, configure network access controls or place OpenFang behind a reverse proxy with authentication.
+
+## Agent Resolution
+
+The `model` field in your request resolves to an agent using the following priority:
+
+1. **`openfang:<name>`** — Explicit agent name with prefix (e.g., `openfang:researcher`)
+2. **Valid UUID** — Direct agent ID lookup (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+3. **Plain string** — Agent name without prefix (e.g., `researcher`)
+
+If no agent matches, you'll receive a `404` error with `model_not_found` code.
+
+<CodeGroup>
+
+```bash Name Resolution
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openfang:researcher",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+```bash UUID Resolution
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "550e8400-e29b-41d4-a716-446655440000",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+```bash Plain Name
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "researcher",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+</CodeGroup>
+
+---
+
+## POST /v1/chat/completions
+
+Send a message to an agent and receive a completion response. Supports both streaming and non-streaming modes.
+
+### Request Body
+
+<ParamField body="model" type="string" required>
+  Agent identifier — name, UUID, or `openfang:<name>` format
+</ParamField>
+
+<ParamField body="messages" type="array" required>
+  Array of message objects with `role` and `content` fields. Supports `user`, `assistant`, and `system` roles.
+</ParamField>
+
+<ParamField body="stream" type="boolean" default="false">
+  Enable Server-Sent Events (SSE) streaming for real-time token delivery
+</ParamField>
+
+<ParamField body="max_tokens" type="integer">
+  Maximum tokens to generate (passed to underlying LLM if supported)
+</ParamField>
+
+<ParamField body="temperature" type="float">
+  Sampling temperature 0.0-2.0 (passed to underlying LLM if supported)
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="string">
+  Unique request identifier in format `chatcmpl-<uuid>`
+</ResponseField>
+
+<ResponseField name="object" type="string">
+  Always `"chat.completion"` for non-streaming, `"chat.completion.chunk"` for streaming
+</ResponseField>
+
+<ResponseField name="created" type="integer">
+  Unix timestamp of response creation
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  Agent name that processed the request
+</ResponseField>
+
+<ResponseField name="choices" type="array">
+  Array containing the completion choice(s)
+  
+  <ResponseField name="index" type="integer">
+    Choice index (always 0 for single completions)
+  </ResponseField>
+  
+  <ResponseField name="message" type="object">
+    The assistant's response message
+    
+    <ResponseField name="role" type="string">
+      Always `"assistant"`
+    </ResponseField>
+    
+    <ResponseField name="content" type="string">
+      The response text (with `<think>` tags stripped)
+    </ResponseField>
+    
+    <ResponseField name="tool_calls" type="array">
+      Tool calls made by the agent (if any)
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="finish_reason" type="string">
+    Reason completion stopped: `"stop"`, `"length"`, `"tool_calls"`
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Token usage statistics
+  
+  <ResponseField name="prompt_tokens" type="integer">
+    Input tokens consumed
+  </ResponseField>
+  
+  <ResponseField name="completion_tokens" type="integer">
+    Output tokens generated
+  </ResponseField>
+  
+  <ResponseField name="total_tokens" type="integer">
+    Sum of prompt and completion tokens
+  </ResponseField>
+</ResponseField>
+
+### Non-Streaming Example
+
+<CodeGroup>
+
+```bash curl
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openfang:assistant",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is Rust?"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 150
+  }'
+```
+
+```python Python (OpenAI SDK)
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:4200/v1",
+    api_key="not-needed"  # OpenFang doesn't require API key locally
+)
+
+response = client.chat.completions.create(
+    model="openfang:assistant",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is Rust?"}
+    ],
+    temperature=0.7,
+    max_tokens=150
+)
+
+print(response.choices[0].message.content)
+```
+
+```javascript Node.js (OpenAI SDK)
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4200/v1',
+  apiKey: 'not-needed' // OpenFang doesn't require API key locally
+});
+
+const response = await client.chat.completions.create({
+  model: 'openfang:assistant',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'What is Rust?' }
+  ],
+  temperature: 0.7,
+  max_tokens: 150
+});
+
+console.log(response.choices[0].message.content);
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```json Response
+{
+  "id": "chatcmpl-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "object": "chat.completion",
+  "created": 1709654400,
+  "model": "assistant",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Rust is a systems programming language focused on safety, speed, and concurrency. It achieves memory safety without garbage collection through its unique ownership system. Rust is commonly used for operating systems, web servers, game engines, and high-performance applications where control and reliability are critical."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 28,
+    "completion_tokens": 52,
+    "total_tokens": 80
+  }
+}
+```
+
+</CodeGroup>
+
+### Streaming Example
+
+When `stream: true`, the response is delivered as Server-Sent Events (SSE). Each chunk contains incremental deltas.
+
+<CodeGroup>
+
+```bash curl (streaming)
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openfang:assistant",
+    "messages": [
+      {"role": "user", "content": "Count to 5"}
+    ],
+    "stream": true
+  }'
+```
+
+```python Python (streaming)
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:4200/v1",
+    api_key="not-needed"
+)
+
+stream = client.chat.completions.create(
+    model="openfang:assistant",
+    messages=[{"role": "user", "content": "Count to 5"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end='', flush=True)
+```
+
+```javascript Node.js (streaming)
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4200/v1',
+  apiKey: 'not-needed'
+});
+
+const stream = await client.chat.completions.create({
+  model: 'openfang:assistant',
+  messages: [{ role: 'user', content: 'Count to 5' }],
+  stream: true
+});
+
+for await (const chunk of stream) {
+  const content = chunk.choices[0]?.delta?.content || '';
+  process.stdout.write(content);
+}
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```text SSE Stream Output
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"content":"1"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"content":", 2"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"content":", 3"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"content":", 4"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{"content":", 5"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1709654400,"model":"assistant","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+</CodeGroup>
+
+### Multimodal (Vision) Support
+
+OpenFang supports image inputs via base64-encoded data URIs. Images are passed to the agent's underlying LLM if it supports vision.
+
+<CodeGroup>
+
+```bash curl (with image)
+curl http://127.0.0.1:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openfang:vision-analyst",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "What is in this image?"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."
+            }
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+```python Python (with image)
+import base64
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:4200/v1",
+    api_key="not-needed"
+)
+
+# Read and encode image
+with open("image.png", "rb") as f:
+    image_data = base64.b64encode(f.read()).decode()
+
+response = client.chat.completions.create(
+    model="openfang:vision-analyst",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image_data}"
+                    }
+                }
+            ]
+        }
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+</CodeGroup>
+
+<Note>
+**Image Support Notes:**
+- Only base64-encoded data URIs are supported (format: `data:image/{type};base64,{data}`)
+- URL-based images are not supported (would require external fetching)
+- The agent's configured LLM must support vision (e.g., Claude 3, GPT-4V, Gemini Pro Vision)
+</Note>
+
+---
+
+## GET /v1/models
+
+List all available agents as OpenAI-compatible model objects. Each agent appears as a model with the `openfang:<name>` identifier.
+
+### Response
+
+<ResponseField name="object" type="string">
+  Always `"list"`
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of model objects
+  
+  <ResponseField name="id" type="string">
+    Model identifier in format `openfang:<agent_name>`
+  </ResponseField>
+  
+  <ResponseField name="object" type="string">
+    Always `"model"`
+  </ResponseField>
+  
+  <ResponseField name="created" type="integer">
+    Unix timestamp when agent was registered
+  </ResponseField>
+  
+  <ResponseField name="owned_by" type="string">
+    Always `"openfang"`
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+<CodeGroup>
+
+```bash curl
+curl http://127.0.0.1:4200/v1/models
+```
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:4200/v1",
+    api_key="not-needed"
+)
+
+models = client.models.list()
+for model in models.data:
+    print(f"Agent: {model.id}")
+```
+
+```javascript Node.js
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4200/v1',
+  apiKey: 'not-needed'
+});
+
+const models = await client.models.list();
+models.data.forEach(model => {
+  console.log(`Agent: ${model.id}`);
+});
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```json Response
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "openfang:assistant",
+      "object": "model",
+      "created": 1709654400,
+      "owned_by": "openfang"
+    },
+    {
+      "id": "openfang:researcher",
+      "object": "model",
+      "created": 1709654400,
+      "owned_by": "openfang"
+    },
+    {
+      "id": "openfang:vision-analyst",
+      "object": "model",
+      "created": 1709654400,
+      "owned_by": "openfang"
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+---
+
+## Error Responses
+
+All errors follow OpenAI's error format with a structured error object.
+
+### Model Not Found (404)
+
+<CodeGroup>
+
+```json 404 Response
+{
+  "error": {
+    "message": "No agent found for model 'nonexistent-agent'",
+    "type": "invalid_request_error",
+    "code": "model_not_found"
+  }
+}
+```
+
+</CodeGroup>
+
+### Missing User Message (400)
+
+<CodeGroup>
+
+```json 400 Response
+{
+  "error": {
+    "message": "No user message found in request",
+    "type": "invalid_request_error",
+    "code": "missing_message"
+  }
+}
+```
+
+</CodeGroup>
+
+### Agent Processing Failed (500)
+
+<CodeGroup>
+
+```json 500 Response
+{
+  "error": {
+    "message": "Agent processing failed",
+    "type": "server_error"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+## Integration Examples
+
+### Use with LangChain
+
+<CodeGroup>
+
+```python LangChain Integration
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
+
+llm = ChatOpenAI(
+    openai_api_base="http://127.0.0.1:4200/v1",
+    openai_api_key="not-needed",
+    model_name="openfang:assistant"
+)
+
+messages = [
+    SystemMessage(content="You are a helpful assistant."),
+    HumanMessage(content="What are autonomous agents?")
+]
+
+response = llm(messages)
+print(response.content)
+```
+
+</CodeGroup>
+
+### Use with Cursor AI
+
+Configure Cursor to use OpenFang as an LLM provider:
+
+1. Open Cursor Settings → Models
+2. Add custom OpenAI-compatible endpoint: `http://127.0.0.1:4200/v1`
+3. Set model name to `openfang:<your-agent-name>`
+4. Leave API key empty or set to `not-needed`
+
+Your OpenFang agents now power Cursor's code completion and chat.
+
+### Use with Continue.dev
+
+Add to your `~/.continue/config.json`:
+
+<CodeGroup>
+
+```json Continue.dev Config
+{
+  "models": [
+    {
+      "title": "OpenFang Assistant",
+      "provider": "openai",
+      "model": "openfang:assistant",
+      "apiBase": "http://127.0.0.1:4200/v1",
+      "apiKey": "not-needed"
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+### Use with Anything That Supports OpenAI
+
+Any tool, library, or platform that supports custom OpenAI endpoints can use OpenFang:
+
+- **LM Studio** — Add custom endpoint in settings
+- **Jan.ai** — Configure remote server with OpenFang URL
+- **Open WebUI** — Add as OpenAI-compatible connection
+- **LibreChat** — Add as custom endpoint
+- **BetterChatGPT** — Configure API endpoint
+- **Chatbox** — Add custom OpenAI endpoint
+
+The pattern is always the same:
+- **Base URL**: `http://127.0.0.1:4200/v1`
+- **API Key**: `not-needed` (or leave empty)
+- **Model**: `openfang:<agent-name>` or just agent name
+
+---
+
+## Tool Calls and Multi-Turn Execution
+
+When an agent uses tools during execution, the OpenAI-compatible API surfaces this through the `tool_calls` field in streaming chunks. The agent may execute multiple tool-use iterations before responding.
+
+<Note>
+OpenFang automatically handles the full agent loop — tool execution, memory access, security checks, and multi-turn reasoning. From the client's perspective, you just see streaming text and optional tool call deltas.
+</Note>
+
+### Tool Call Streaming Format
+
+When streaming is enabled and the agent invokes tools:
+
+1. **ToolUseStart** → Chunk with `tool_calls` array containing `id`, `type`, and `function.name`
+2. **ToolInputDelta** → Incremental chunks with `function.arguments` text
+3. **ContentComplete (ToolUse)** → Tool execution happens server-side, client sees no explicit marker
+4. Agent may perform additional tool calls or proceed to final response
+5. **Final text deltas** → Agent's final response text
+6. **Finish chunk** → `finish_reason: "stop"`
+
+<CodeGroup>
+
+```text Tool Call SSE Stream
+data: {"id":"chatcmpl-123","choices":[{"delta":{"role":"assistant"}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","type":"function","function":{"name":"web_search","arguments":""}}]}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"query\""}}]}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":":\"rust lang"}}]}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"uage\"}"}}]}}]}
+
+// Tool executes server-side, then agent continues...
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"content":"Based on"}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{"content":" the search"}}]}
+
+data: {"id":"chatcmpl-123","choices":[{"delta":{}},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+</CodeGroup>
+
+---
+
+## Implementation Details
+
+### Message Conversion
+
+OpenFang converts OpenAI message format to its internal representation:
+
+- **Text content** → `MessageContent::Text`
+- **Multipart content with images** → `MessageContent::Blocks` with `ContentBlock::Text` and `ContentBlock::Image`
+- **Role mapping** → `user`/`assistant`/`system` → `Role::User`/`Role::Assistant`/`Role::System`
+
+### Response Formatting
+
+- `<think>` tags are automatically stripped from agent responses
+- Token usage includes the full agent loop (all LLM calls across tool use iterations)
+- Agent name is returned as the model identifier (without `openfang:` prefix)
+- Streaming delivers all iterations until the agent loop channel closes
+
+### Performance
+
+- **Cold start**: ~180ms (agent loop initialization)
+- **Streaming latency**: First token typically within 200-500ms depending on LLM provider
+- **Non-streaming**: Full response after agent completes all tool use and reasoning
+- **Memory overhead**: ~40MB base + agent working memory
+
+---
+
+## Limitations
+
+### What's Not Supported
+
+- **Function calling** (explicit tool definitions in request) — Use agent's built-in tools instead
+- **Fine-tuned models** — Model field only resolves to agents, not external LLM models
+- **Logprobs** — Not exposed in current version
+- **Multiple choices (n > 1)** — Always returns single completion
+- **Stop sequences** — Not configurable per request
+- **Presence/frequency penalties** — Not exposed through API (agent's LLM config applies)
+
+### What's Different from OpenAI
+
+- **No API key required** for local usage (production deployments should add auth)
+- **Model field is agent identifier** not LLM model (agent's config determines which LLM to use)
+- **Full agent capabilities** — Agents have memory, tools, security, persistent state
+- **Multi-turn automatic** — Agent loop may execute multiple LLM calls transparently
+- **Tool execution is server-side** — Client sees tool call deltas but doesn't execute tools
+
+---
+
+## Security Considerations
+
+### Local Development
+
+By default, OpenFang's API server binds to `127.0.0.1:4200`, making it accessible only from localhost.
+
+### Production Deployment
+
+If exposing OpenFang's API to a network or the internet:
+
+1. **Add authentication** — Place behind reverse proxy (nginx, Caddy) with API key validation
+2. **Use HTTPS** — TLS-terminate at proxy for encrypted transport
+3. **Rate limiting** — OpenFang has built-in GCRA rate limiter, configure in `config.toml`
+4. **Network isolation** — Restrict access to trusted IP ranges
+5. **Monitor usage** — Enable budget tracking and cost monitoring
+
+<Note>
+OpenFang's 16-layer security architecture protects agent execution (WASM sandbox, SSRF protection, taint tracking, etc.) but the HTTP API itself requires external authentication for production use.
+</Note>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="REST API Reference" icon="code" href="/api/overview">
+    Explore OpenFang's full native REST API
+  </Card>
+  <Card title="Agent Configuration" icon="sliders" href="/guides/creating-agents">
+    Configure agents with tools, memory, and hands
+  </Card>
+  <Card title="Tool Development" icon="wrench" href="/guides/skill-development">
+    Build custom tools for your agents
+  </Card>
+  <Card title="Security Architecture" icon="shield" href="/concepts/security">
+    Learn about OpenFang's 16 security systems
+  </Card>
+</CardGroup>

@@ -1,0 +1,193 @@
+---
+title: 'Benchmarks'
+description: 'Performance benchmarks comparing OpenFang with other agent frameworks'
+icon: 'chart-line'
+---
+
+OpenFang is built for performance. All benchmarks are measured from official documentation and public repositories, collected in February 2026.
+
+## Performance Metrics
+
+OpenFang delivers exceptional performance across all critical metrics:
+
+<CardGroup cols={2}>
+  <Card title="Cold Start Time" icon="bolt">
+    180ms - Fast enough for serverless deployments
+  </Card>
+  <Card title="Memory Footprint" icon="microchip">
+    40 MB idle - Efficient resource usage
+  </Card>
+  <Card title="Install Size" icon="download">
+    32 MB - Single binary, no dependencies
+  </Card>
+  <Card title="Security Systems" icon="shield">
+    16 layers - Defense in depth
+  </Card>
+</CardGroup>
+
+## Cold Start Time
+
+Lower is better. OpenFang starts in under 200ms.
+
+```
+ZeroClaw   ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   10 ms
+OpenFang   ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  180 ms    ★
+LangGraph  █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░  2.5 sec
+CrewAI     ████████████████████░░░░░░░░░░░░░░░░░░░░░░  3.0 sec
+AutoGen    ██████████████████████████░░░░░░░░░░░░░░░░░  4.0 sec
+OpenClaw   █████████████████████████████████████████░░  5.98 sec
+```
+
+<Note>
+  OpenFang's Rust architecture enables near-instant startup, making it ideal for serverless and edge deployments.
+</Note>
+
+## Idle Memory Usage
+
+Lower is better. OpenFang uses only 40 MB at idle.
+
+```
+ZeroClaw   █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    5 MB
+OpenFang   ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   40 MB    ★
+LangGraph  ██████████████████░░░░░░░░░░░░░░░░░░░░░░░░░  180 MB
+CrewAI     ████████████████████░░░░░░░░░░░░░░░░░░░░░░░  200 MB
+AutoGen    █████████████████████████░░░░░░░░░░░░░░░░░░  250 MB
+OpenClaw   ████████████████████████████████████████░░░░  394 MB
+```
+
+<Note>
+  Memory efficiency means you can run more agents simultaneously on the same hardware.
+</Note>
+
+## Install Size
+
+Lower is better. OpenFang ships as a single 32 MB binary.
+
+```
+ZeroClaw   █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  8.8 MB
+OpenFang   ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   32 MB    ★
+CrewAI     ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  100 MB
+LangGraph  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  150 MB
+AutoGen    ████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░  200 MB
+OpenClaw   ████████████████████████████████████████░░░░  500 MB
+```
+
+<Note>
+  One binary means one install, one command, your agents are live. No Python environments, no npm packages, no Docker layers.
+</Note>
+
+## Security Systems
+
+Higher is better. OpenFang implements 16 independent security layers.
+
+```
+OpenFang   ████████████████████████████████████████████   16      ★
+ZeroClaw   ███████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░    6
+OpenClaw   ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    3
+AutoGen    █████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    2
+LangGraph  █████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    2
+CrewAI     ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    1
+```
+
+<Warning>
+  Security isn't optional for production agents. OpenFang's defense-in-depth approach ensures every layer is independently testable.
+</Warning>
+
+## Channel Adapters
+
+Higher is better. OpenFang supports 40 messaging platforms out of the box.
+
+```
+OpenFang   ████████████████████████████████████████████   40      ★
+ZeroClaw   ███████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░   15
+OpenClaw   █████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   13
+CrewAI     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    0
+AutoGen    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    0
+LangGraph  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    0
+```
+
+## LLM Providers
+
+Higher is better. OpenFang supports 27 LLM providers with 123+ models.
+
+```
+ZeroClaw   ████████████████████████████████████████████   28
+OpenFang   ██████████████████████████████████████████░░   27      ★
+LangGraph  ██████████████████████░░░░░░░░░░░░░░░░░░░░░   15
+CrewAI     ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   10
+OpenClaw   ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   10
+AutoGen    ███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    8
+```
+
+## Feature Comparison
+
+| Feature | OpenFang | OpenClaw | ZeroClaw | CrewAI | AutoGen | LangGraph |
+|---------|----------|----------|----------|--------|---------|-----------||
+| **Language** | **Rust** | TypeScript | **Rust** | Python | Python | Python |
+| **Autonomous Hands** | **7 built-in** | None | None | None | None | None |
+| **Security Layers** | **16 discrete** | 3 basic | 6 layers | 1 basic | Docker | AES enc. |
+| **Agent Sandbox** | **WASM dual-metered** | None | Allowlists | None | Docker | None |
+| **Channel Adapters** | **40** | 13 | 15 | 0 | 0 | 0 |
+| **Built-in Tools** | **53 + MCP + A2A** | 50+ | 12 | Plugins | MCP | LC tools |
+| **Memory** | **SQLite + vector** | File-based | SQLite FTS5 | 4-layer | External | Checkpoints |
+| **Desktop App** | **Tauri 2.0** | None | None | None | Studio | None |
+| **Audit Trail** | **Merkle hash-chain** | Logs | Logs | Tracing | Logs | Checkpoints |
+| **Cold Start** | **&lt;200ms** | ~6s | ~10ms | ~3s | ~4s | ~2.5s |
+| **Install Size** | **~32 MB** | ~500 MB | ~8.8 MB | ~100 MB | ~200 MB | ~150 MB |
+| **License** | MIT | MIT | MIT | MIT | Apache 2.0 | MIT |
+
+## System Requirements
+
+<Accordion title="Minimum Requirements">
+  - **RAM:** 128 MB
+  - **Disk:** 50 MB (binary only)
+  - **CPU:** Any x86_64/ARM64
+  - **OS:** Linux, macOS, or Windows
+</Accordion>
+
+<Accordion title="Recommended Requirements">
+  - **RAM:** 512 MB or more
+  - **Disk:** 500 MB (with data)
+  - **CPU:** 2+ cores
+  - **OS:** Any modern Linux, macOS, or Windows
+  - **Rust:** Latest stable (for building from source)
+</Accordion>
+
+## Production Statistics
+
+<CardGroup cols={3}>
+  <Card title="Lines of Code" icon="code">
+    137,728 across 14 crates
+  </Card>
+  <Card title="Test Coverage" icon="check">
+    1,767+ tests, all passing
+  </Card>
+  <Card title="Code Quality" icon="wand-magic-sparkles">
+    Zero clippy warnings
+  </Card>
+</CardGroup>
+
+## Why Rust?
+
+OpenFang is built in Rust for three critical reasons:
+
+1. **Performance**: Native compilation, zero-cost abstractions, and minimal runtime overhead
+2. **Safety**: Memory safety without garbage collection, preventing entire classes of bugs
+3. **Reliability**: Strong type system and exhaustive pattern matching catch errors at compile time
+
+<Note>
+  The performance gap between OpenFang and Python-based frameworks isn't just about benchmarks - it's about being able to run production agents on constrained hardware, respond instantly to events, and scale efficiently.
+</Note>
+
+## Methodology
+
+All benchmarks were collected from official documentation and public repositories in February 2026. Performance measurements use:
+
+- **Cold start**: Time from process launch to first API response
+- **Idle memory**: RSS memory usage with daemon running, no active agents
+- **Install size**: Total disk space after installation
+- **Security systems**: Count of discrete, independently testable security mechanisms
+- **Channel adapters**: Number of built-in messaging platform integrations
+- **LLM providers**: Number of supported LLM API providers
+
+For questions about methodology or to report inaccuracies, please [open an issue](https://github.com/RightNow-AI/openfang/issues).

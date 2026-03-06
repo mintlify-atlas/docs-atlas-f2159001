@@ -1,0 +1,258 @@
+---
+title: CLI Overview
+description: Complete command-line reference for the OpenFang CLI
+---
+
+# OpenFang CLI Overview
+
+The `openfang` binary is the primary interface for managing the OpenFang Agent OS. It provides comprehensive control over agents, workflows, skills, channels, and system configuration.
+
+## Two Operation Modes
+
+OpenFang CLI supports two modes of operation:
+
+### Daemon Mode (Recommended)
+
+When a daemon is running (`openfang start`), CLI commands communicate with it over HTTP. This is the recommended mode for production use.
+
+```bash
+openfang start
+# In another terminal
+openfang agent list
+openfang chat
+```
+
+<Note>
+  Daemon mode provides persistent agents, background task execution, and the web dashboard.
+</Note>
+
+### In-Process Mode
+
+When no daemon is detected, commands boot an ephemeral in-process kernel. Agents spawned in this mode are not persisted and will be lost when the process exits.
+
+```bash
+# No daemon running
+openfang chat  # Boots temporary kernel, spawns agent
+```
+
+<Warning>
+  Agents created in in-process mode are ephemeral and will be lost when the CLI exits.
+</Warning>
+
+## Installation
+
+### From Source (Cargo)
+
+```bash
+cargo install --path crates/openfang-cli
+```
+
+### Build from Workspace
+
+```bash
+cargo build --release -p openfang-cli
+# Binary: target/release/openfang (or openfang.exe on Windows)
+```
+
+### Docker
+
+```bash
+docker run -it openfang/openfang:latest
+```
+
+### Shell Installer
+
+```bash
+curl -fsSL https://get.openfang.ai | sh
+```
+
+## Global Options
+
+These options apply to all commands:
+
+| Option | Description |
+|---|---|
+| `--config <PATH>` | Path to a custom config file (overrides `~/.openfang/config.toml`) |
+| `--help` | Print help information for any command or subcommand |
+| `--version` | Print the version of the `openfang` binary |
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `RUST_LOG` | Controls log verbosity (e.g. `info`, `debug`, `openfang_kernel=trace`) |
+| `OPENFANG_HOME` | Override the default `~/.openfang/` directory |
+| `OPENFANG_AGENTS_DIR` | Override the agent templates directory |
+| `EDITOR` / `VISUAL` | Editor used by `openfang config edit` (falls back to `notepad` on Windows or `vi` on Unix) |
+
+## Interactive TUI Dashboard
+
+Running `openfang` with no subcommand launches the interactive TUI (terminal user interface):
+
+```bash
+openfang
+```
+
+The TUI provides a full-screen terminal interface with panels for:
+
+- Agents management
+- Interactive chat
+- Workflows
+- Channels
+- Skills
+- Settings
+- System status
+
+<Note>
+  Press `Ctrl+C` to exit. A second `Ctrl+C` force-exits the process. Tracing output is redirected to `~/.openfang/tui.log`.
+</Note>
+
+## Quick Start Guide
+
+### First-Time Setup
+
+```bash
+# 1. Set your API key
+export GROQ_API_KEY="gsk_your_key_here"
+
+# 2. Initialize OpenFang
+openfang init --quick
+
+# 3. Start the daemon
+openfang start
+```
+
+### Daily Usage
+
+```bash
+# Quick chat (auto-spawns agent if needed)
+openfang chat
+
+# Chat with a specific agent
+openfang chat coder
+
+# Check what's running
+openfang status
+
+# Open the web dashboard
+openfang dashboard
+```
+
+## Core Commands
+
+### Initialization & Daemon
+
+- `openfang init` - Initialize workspace and configuration
+- `openfang start` - Start the daemon
+- `openfang stop` - Stop the running daemon
+- `openfang status` - Show daemon status
+- `openfang doctor` - Run diagnostic health checks
+
+### Quick Actions
+
+- `openfang chat [agent]` - Start a chat session
+- `openfang dashboard` - Open web dashboard
+- `openfang tui` - Launch terminal UI
+
+### Management Commands
+
+- `openfang agent` - Manage agents (new, list, chat, kill)
+- `openfang workflow` - Manage workflows
+- `openfang skill` - Manage skills
+- `openfang channel` - Manage channel integrations
+- `openfang config` - Configuration management
+
+## Daemon Auto-Detection
+
+The CLI uses a two-step mechanism to detect a running daemon:
+
+1. **Read `daemon.json`** - The daemon writes `~/.openfang/daemon.json` containing the listen address
+2. **Health check** - The CLI sends `GET http://<listen_addr>/api/health` with a 2-second timeout
+
+If either step fails, the CLI falls back to in-process mode for commands that support it.
+
+```bash
+openfang start          # Starts daemon, writes daemon.json
+openfang status         # Connects to daemon via HTTP
+# Ctrl+C                # Daemon shuts down, daemon.json removed
+openfang doctor --repair  # Cleans up stale daemon.json from crashes
+```
+
+## Environment File
+
+OpenFang loads `~/.openfang/.env` into the process environment on every CLI invocation. System environment variables take priority over `.env` values.
+
+```bash
+GROQ_API_KEY=gsk_...
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AIza...
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+```
+
+<Note>
+  Manage keys with `openfang config set-key` / `openfang config delete-key` commands rather than editing the file directly to enforce correct permissions.
+</Note>
+
+## Exit Codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | General error (invalid arguments, failed operations, missing daemon, parse errors, spawn failures) |
+| `130` | Interrupted by second `Ctrl+C` (force exit) |
+
+## Shell Completions
+
+Generate shell completion scripts for your shell:
+
+```bash
+# Bash
+openfang completion bash >> ~/.bashrc
+
+# Zsh
+openfang completion zsh > "${fpath[1]}/_openfang"
+
+# Fish
+openfang completion fish > ~/.config/fish/completions/openfang.fish
+
+# PowerShell
+openfang completion powershell > openfang.ps1
+```
+
+## Supported LLM Providers
+
+The following providers are recognized by `openfang config set-key` and `openfang doctor`:
+
+| Provider | Environment Variable | Default Model |
+|---|---|---|
+| Groq | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| Gemini | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
+| OpenRouter | `OPENROUTER_API_KEY` | `openrouter/auto` |
+| Together | `TOGETHER_API_KEY` | -- |
+| Mistral | `MISTRAL_API_KEY` | -- |
+| Fireworks | `FIREWORKS_API_KEY` | -- |
+| Perplexity | `PERPLEXITY_API_KEY` | -- |
+| Cohere | `COHERE_API_KEY` | -- |
+| xAI | `XAI_API_KEY` | -- |
+
+Additional search/fetch provider keys: `BRAVE_API_KEY`, `TAVILY_API_KEY`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Daemon Management" icon="server" href="/cli/daemon">
+    Learn about starting, stopping, and managing the OpenFang daemon
+  </Card>
+  <Card title="Agent Commands" icon="robot" href="/cli/agent-commands">
+    Create and manage AI agents from the command line
+  </Card>
+  <Card title="Workflow Commands" icon="diagram-project" href="/cli/workflow-commands">
+    Orchestrate multi-step agent workflows
+  </Card>
+  <Card title="Skills & Channels" icon="puzzle-piece" href="/cli/skill-commands">
+    Install skills and configure integrations
+  </Card>
+</CardGroup>

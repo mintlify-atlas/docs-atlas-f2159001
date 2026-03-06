@@ -1,0 +1,487 @@
+---
+title: 'Channels API'
+description: 'Connect agents to Telegram, Discord, Slack, and 40+ platforms'
+---
+
+## Overview
+
+Channels enable agents to interact with external platforms like messaging apps, social media, and notification services. OpenFang supports **40 adapters** out of the box.
+
+## Channel Categories
+
+<CardGroup cols={2}>
+  <Card title="Messaging (12)" icon="comments">
+    Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Email, LINE, Viber, Messenger, Threema, Keybase
+  </Card>
+  <Card title="Social (5)" icon="hashtag">
+    Reddit, Mastodon, Bluesky, LinkedIn, Nostr
+  </Card>
+  <Card title="Enterprise (10)" icon="building">
+    Teams, Mattermost, Google Chat, Webex, Feishu, DingTalk, Pumble, Flock, Twist, Zulip
+  </Card>
+  <Card title="Developer (9)" icon="code">
+    IRC, XMPP, Gitter, Discourse, Revolt, Guilded, Nextcloud, Rocket.Chat, Twitch
+  </Card>
+  <Card title="Notifications (4)" icon="bell">
+    ntfy, Gotify, Webhook, Mumble
+  </Card>
+</CardGroup>
+
+## List Channels
+
+Get all available channel adapters and their configuration status:
+
+```bash GET /api/channels
+curl http://127.0.0.1:4200/api/channels
+```
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "name": "telegram",
+    "display_name": "Telegram",
+    "icon": "TG",
+    "description": "Telegram Bot API — long-polling adapter",
+    "category": "messaging",
+    "difficulty": "Easy",
+    "setup_time": "~2 min",
+    "quick_setup": "Paste your bot token from @BotFather",
+    "setup_type": "form",
+    "configured": true,
+    "active": true,
+    "fields": [
+      {
+        "key": "bot_token_env",
+        "label": "Bot Token",
+        "type": "secret",
+        "env_var": "TELEGRAM_BOT_TOKEN",
+        "required": true,
+        "has_value": true,
+        "placeholder": "123456:ABC-DEF...",
+        "advanced": false
+      }
+    ],
+    "setup_steps": [
+      "Open @BotFather on Telegram",
+      "Send /newbot and follow the prompts",
+      "Paste the token below"
+    ],
+    "config_template": "[channels.telegram]\nbot_token_env = \"TELEGRAM_BOT_TOKEN\""
+  }
+]
+```
+</ResponseExample>
+
+## Configure Channel
+
+Add or update a channel configuration:
+
+```bash POST /api/channels/{name}/configure
+curl -X POST http://127.0.0.1:4200/api/channels/telegram/configure \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "default_agent": "assistant",
+    "poll_interval_secs": 1
+  }'
+```
+
+### Common Fields
+
+<ParamField body="default_agent" type="string">
+  Default agent to route messages to (by name)
+</ParamField>
+
+<ParamField body="allowed_users" type="array">
+  Whitelist of user IDs (platform-specific)
+</ParamField>
+
+<ParamField body="allowed_channels" type="array">
+  Whitelist of channel/room IDs
+</ParamField>
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "configured",
+  "channel": "telegram"
+}
+```
+</ResponseExample>
+
+## Remove Channel
+
+Delete a channel configuration:
+
+```bash DELETE /api/channels/{name}/configure
+curl -X DELETE http://127.0.0.1:4200/api/channels/telegram/configure
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "removed",
+  "channel": "telegram"
+}
+```
+</ResponseExample>
+
+## Test Channel
+
+Verify a channel configuration by sending a test message:
+
+```bash POST /api/channels/{name}/test
+curl -X POST http://127.0.0.1:4200/api/channels/telegram/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello from OpenFang!"
+  }'
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "success",
+  "message": "Test message sent"
+}
+```
+</ResponseExample>
+
+## Reload Channels
+
+Hot-reload channel configuration without restarting:
+
+```bash POST /api/channels/reload
+curl -X POST http://127.0.0.1:4200/api/channels/reload
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "reloaded",
+  "channels_active": 3
+}
+```
+</ResponseExample>
+
+## WhatsApp QR Login
+
+WhatsApp supports QR code login for personal accounts (no Business API needed).
+
+### Start QR Session
+
+```bash POST /api/channels/whatsapp/qr/start
+curl -X POST http://127.0.0.1:4200/api/channels/whatsapp/qr/start
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "session_id": "qr-abc123",
+  "status": "waiting_for_scan"
+}
+```
+</ResponseExample>
+
+### Get QR Status
+
+Poll for QR code and connection status:
+
+```bash GET /api/channels/whatsapp/qr/status
+curl http://127.0.0.1:4200/api/channels/whatsapp/qr/status?session_id=qr-abc123
+```
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "waiting_for_scan",
+  "qr_code": "data:image/png;base64,...",
+  "expires_at": "2025-03-06T12:05:00Z"
+}
+```
+</ResponseExample>
+
+Once scanned:
+
+```json
+{
+  "status": "connected",
+  "phone_number": "+1234567890"
+}
+```
+
+## Messaging Channels
+
+### Telegram
+
+**Setup**: Create a bot with @BotFather
+
+<CodeGroup>
+```toml Config
+[channels.telegram]
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+default_agent = "assistant"
+allowed_users = [123456789, 987654321]
+poll_interval_secs = 1
+```
+
+```bash Environment
+export TELEGRAM_BOT_TOKEN="123456:ABC-DEF..."
+```
+</CodeGroup>
+
+### Discord
+
+**Setup**: Create a bot at discord.com/developers/applications
+
+<CodeGroup>
+```toml Config
+[channels.discord]
+bot_token_env = "DISCORD_BOT_TOKEN"
+default_agent = "assistant"
+allowed_guilds = [123456789]
+intents = 37376  # MESSAGE_CONTENT + GUILD_MESSAGES
+```
+
+```bash Environment
+export DISCORD_BOT_TOKEN="MTIz..."
+```
+</CodeGroup>
+
+### Slack
+
+**Setup**: Create an app at api.slack.com/apps with Socket Mode enabled
+
+<CodeGroup>
+```toml Config
+[channels.slack]
+app_token_env = "SLACK_APP_TOKEN"
+bot_token_env = "SLACK_BOT_TOKEN"
+default_agent = "assistant"
+allowed_channels = ["C01234"]
+```
+
+```bash Environment
+export SLACK_APP_TOKEN="xapp-1-..."
+export SLACK_BOT_TOKEN="xoxb-..."
+```
+</CodeGroup>
+
+### Email (IMAP/SMTP)
+
+**Setup**: Use app passwords for Gmail/Outlook
+
+<CodeGroup>
+```toml Config
+[channels.email]
+username = "bot@example.com"
+password_env = "EMAIL_PASSWORD"
+imap_host = "imap.gmail.com"
+smtp_host = "smtp.gmail.com"
+imap_port = 993
+smtp_port = 587
+default_agent = "assistant"
+```
+
+```bash Environment
+export EMAIL_PASSWORD="your-app-password"
+```
+</CodeGroup>
+
+## Social Channels
+
+### Reddit
+
+**Setup**: Create an app at reddit.com/prefs/apps (script type)
+
+<CodeGroup>
+```toml Config
+[channels.reddit]
+client_id = "abc123def"
+client_secret_env = "REDDIT_CLIENT_SECRET"
+username = "openfang_bot"
+password_env = "REDDIT_PASSWORD"
+subreddits = ["openfang", "rust"]
+default_agent = "assistant"
+```
+
+```bash Environment
+export REDDIT_CLIENT_SECRET="abc123..."
+export REDDIT_PASSWORD="your-password"
+```
+</CodeGroup>
+
+### Bluesky
+
+**Setup**: Generate an app password in Settings
+
+<CodeGroup>
+```toml Config
+[channels.bluesky]
+identifier = "user.bsky.social"
+app_password_env = "BLUESKY_APP_PASSWORD"
+service_url = "https://bsky.social"
+default_agent = "assistant"
+```
+
+```bash Environment
+export BLUESKY_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+```
+</CodeGroup>
+
+## Enterprise Channels
+
+### Microsoft Teams
+
+**Setup**: Create an Azure Bot registration
+
+<CodeGroup>
+```toml Config
+[channels.teams]
+app_id = "00000000-0000-0000-0000-000000000000"
+app_password_env = "TEAMS_APP_PASSWORD"
+webhook_port = 3978
+default_agent = "assistant"
+```
+
+```bash Environment
+export TEAMS_APP_PASSWORD="abc123..."
+```
+</CodeGroup>
+
+### Mattermost
+
+**Setup**: Create a bot in System Console > Bot Accounts
+
+<CodeGroup>
+```toml Config
+[channels.mattermost]
+server_url = "https://mattermost.example.com"
+token_env = "MATTERMOST_TOKEN"
+default_agent = "assistant"
+allowed_channels = ["abc123", "def456"]
+```
+
+```bash Environment
+export MATTERMOST_TOKEN="abc123..."
+```
+</CodeGroup>
+
+## Developer Channels
+
+### IRC
+
+**Setup**: Choose a server and channel
+
+<CodeGroup>
+```toml Config
+[channels.irc]
+server = "irc.libera.chat"
+nick = "openfang"
+channels = ["#openfang", "#general"]
+port = 6667
+use_tls = false
+default_agent = "assistant"
+```
+</CodeGroup>
+
+### Discourse
+
+**Setup**: Generate an API key in Admin > API
+
+<CodeGroup>
+```toml Config
+[channels.discourse]
+base_url = "https://forum.example.com"
+api_key_env = "DISCOURSE_API_KEY"
+api_username = "system"
+categories = ["general", "support"]
+default_agent = "assistant"
+```
+
+```bash Environment
+export DISCOURSE_API_KEY="abc123..."
+```
+</CodeGroup>
+
+## Notification Channels
+
+### ntfy
+
+**Setup**: Just pick a topic name
+
+<CodeGroup>
+```toml Config
+[channels.ntfy]
+topic = "openfang-alerts"
+server_url = "https://ntfy.sh"
+default_agent = "assistant"
+```
+</CodeGroup>
+
+### Webhook
+
+**Setup**: Optional HMAC secret for verification
+
+<CodeGroup>
+```toml Config
+[channels.webhook]
+secret_env = "WEBHOOK_SECRET"
+listen_port = 8460
+default_agent = "assistant"
+```
+
+```bash Environment
+export WEBHOOK_SECRET="my-secret-key"
+```
+</CodeGroup>
+
+## Field Types
+
+Channel configuration fields use these types:
+
+- `secret` - Password/token (stored in environment variables)
+- `text` - Plain text input
+- `number` - Numeric value (port, interval, etc.)
+- `list` - Comma-separated list
+
+## Security
+
+<Warning>
+**Never store API keys directly in config.toml**. Always use environment variables referenced by `*_env` fields.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Whitelists" icon="shield-check">
+    Use `allowed_users` and `allowed_channels` to restrict access
+  </Card>
+  <Card title="HMAC Signing" icon="signature">
+    Webhook channel supports HMAC-SHA256 for payload verification
+  </Card>
+  <Card title="Environment Variables" icon="lock">
+    All secrets referenced via `*_env` fields (e.g., `bot_token_env`)
+  </Card>
+  <Card title="Audit Trail" icon="list">
+    Channel events logged to kernel audit trail
+  </Card>
+</CardGroup>
+
+## Bridge Manager
+
+The bridge manager coordinates all active channel adapters:
+
+- **Hot-reload**: Changes apply without restarting
+- **Error recovery**: Automatic reconnection on failure
+- **Message routing**: Routes messages to correct agents
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agents API" icon="robot" href="/api/agents">
+    Route channel messages to agents
+  </Card>
+  <Card title="Workflows API" icon="sitemap" href="/api/workflows">
+    Build multi-channel workflows
+  </Card>
+</CardGroup>

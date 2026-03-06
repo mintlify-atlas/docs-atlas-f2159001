@@ -1,0 +1,671 @@
+---
+title: 'Build Your Own Hand'
+description: 'Learn how to create custom Hands for specialized workflows'
+icon: 'code'
+---
+
+## Overview
+
+While OpenFang ships with powerful bundled Hands, you can create custom Hands tailored to your specific workflows. This guide walks through building a Hand from scratch using the HAND.toml format.
+
+## Hand Anatomy
+
+Every Hand consists of:
+
+1. **Metadata** — ID, name, description, category, icon
+2. **Tools** — Which tools the agent can access
+3. **Requirements** (optional) — External dependencies, API keys
+4. **Settings** (optional) — User-configurable options
+5. **Agent Configuration** — LLM settings and system prompt
+6. **Dashboard Metrics** (optional) — Performance tracking
+
+## File Structure
+
+```
+~/.openfang/hands/
+└── my-hand/
+    ├── HAND.toml          # Hand definition
+    └── SKILL.md           # Optional skill documentation
+```
+
+## HAND.toml Format
+
+### Basic Structure
+
+```toml
+# Metadata
+id = "my-hand"
+name = "My Hand"
+description = "What this Hand does in one sentence"
+category = "productivity"  # or "data", "content", "communication"
+icon = "🚀"
+
+# Tools this Hand can use
+tools = [
+    "shell_exec",
+    "file_read",
+    "file_write",
+    "web_fetch",
+    "web_search",
+    "memory_store",
+    "memory_recall"
+]
+
+# Agent configuration
+[agent]
+name = "my-hand"
+description = "Detailed description for internal use"
+module = "builtin:chat"
+provider = "default"
+model = "default"
+max_tokens = 16384
+temperature = 0.3
+max_iterations = 50
+system_prompt = """
+You are My Hand — [describe what the Hand does and how it works]
+
+## Phase 0 — Platform Detection (ALWAYS DO THIS FIRST)
+...
+
+[Rest of system prompt]
+"""
+```
+
+## Example: News Digest Hand
+
+Let's build a Hand that reads news sites and generates a daily digest.
+
+### Step 1: Create the Directory
+
+```bash
+mkdir -p ~/.openfang/hands/news-digest
+cd ~/.openfang/hands/news-digest
+```
+
+### Step 2: Write HAND.toml
+
+```toml
+# ~/.openfang/hands/news-digest/HAND.toml
+
+id = "news-digest"
+name = "News Digest Hand"
+description = "Reads news sites daily and generates a curated digest"
+category = "data"
+icon = "📰"
+
+tools = [
+    "web_fetch",
+    "web_search",
+    "file_write",
+    "file_read",
+    "memory_store",
+    "memory_recall",
+    "schedule_create",
+    "schedule_list"
+]
+
+# Settings
+[[settings]]
+key = "news_sources"
+label = "News Sources"
+description = "Comma-separated list of news sites or topics"
+setting_type = "text"
+default = "TechCrunch, Hacker News, The Verge"
+
+[[settings]]
+key = "digest_frequency"
+label = "Digest Frequency"
+description = "How often to generate digests"
+setting_type = "select"
+default = "daily"
+
+[[settings.options]]
+value = "daily"
+label = "Daily"
+
+[[settings.options]]
+value = "twice_daily"
+label = "Twice Daily"
+
+[[settings.options]]
+value = "weekly"
+label = "Weekly"
+
+[[settings]]
+key = "max_articles"
+label = "Max Articles"
+description = "Maximum number of articles to include in digest"
+setting_type = "select"
+default = "10"
+
+[[settings.options]]
+value = "5"
+label = "5 articles"
+
+[[settings.options]]
+value = "10"
+label = "10 articles"
+
+[[settings.options]]
+value = "20"
+label = "20 articles"
+
+[[settings]]
+key = "output_format"
+label = "Output Format"
+description = "Format for the digest"
+setting_type = "select"
+default = "markdown"
+
+[[settings.options]]
+value = "markdown"
+label = "Markdown"
+
+[[settings.options]]
+value = "html"
+label = "HTML"
+
+[[settings.options]]
+value = "email"
+label = "Email (requires SMTP config)"
+
+# Agent configuration
+[agent]
+name = "news-digest-hand"
+description = "AI news curator that generates daily digests from configured sources"
+module = "builtin:chat"
+provider = "default"
+model = "default"
+max_tokens = 16384
+temperature = 0.3
+max_iterations = 40
+system_prompt = """
+You are News Digest Hand — an AI news curator that reads configured news sources, filters for the most interesting stories, and generates a daily digest.
+
+## Phase 0 — Platform Detection & State Recovery
+
+Detect the operating system:
+```
+python -c "import platform; print(platform.system())"
+```
+
+Recover state:
+1. memory_recall `news_digest_state` — load previous digest history
+2. Read **User Configuration** for news_sources, digest_frequency, max_articles, output_format
+3. file_read `news_digest_seen.json` if it exists — articles already covered
+
+## Phase 1 — Schedule Setup
+
+On first run:
+1. Create digest schedule using schedule_create based on `digest_frequency`:
+   - daily: schedule at 8 AM
+   - twice_daily: schedule at 8 AM and 5 PM
+   - weekly: schedule Monday at 8 AM
+2. Initialize seen articles database: `news_digest_seen.json`
+
+## Phase 2 — News Collection
+
+Parse `news_sources` setting (comma-separated):
+- For known sources (TechCrunch, Hacker News, etc.), use direct fetch
+- For topics (e.g., "AI safety"), use web_search
+
+For each source:
+1. Fetch the homepage or RSS feed
+2. Extract article headlines, URLs, summaries
+3. Check against `news_digest_seen.json` to skip duplicates
+4. Tag each article with: title, url, source, publish_date, summary
+
+Target: Collect 2-3x `max_articles` for filtering.
+
+## Phase 3 — Article Filtering & Ranking
+
+Score each article (0-100):
+- Recency: +30 (published in last 24h)
+- Relevance: +25 (matches user interests from history)
+- Importance: +25 (major news, high engagement)
+- Uniqueness: +20 (not covered elsewhere)
+
+Sort by score, take top N per `max_articles` setting.
+
+## Phase 4 — Digest Generation
+
+Based on `output_format`:
+
+**Markdown:**
+```markdown
+# News Digest — [Date]
+
+## Top Story
+[Article 1 with summary]
+
+## Tech News
+- [Article 2]
+- [Article 3]
+
+## Business
+- [Article 4]
+
+[... up to max_articles ...]
+
+---
+Generated by News Digest Hand
+```
+
+**HTML:**
+```html
+<!DOCTYPE html>
+<html>
+<head><title>News Digest - [Date]</title></head>
+<body>
+<h1>News Digest — [Date]</h1>
+<div class="article">
+  <h2>[Article Title]</h2>
+  <p>[Summary]</p>
+  <a href="[URL]">Read more</a>
+</div>
+...
+</body>
+</html>
+```
+
+**Email:**
+(Requires SMTP configuration — not implemented in this example)
+
+Save as: `news_digest_YYYY-MM-DD.{md,html}`
+
+## Phase 5 — State Persistence
+
+1. Add new articles to `news_digest_seen.json` (avoid re-featuring)
+2. memory_store `news_digest_state`: last_run, total_articles, total_digests
+3. Update dashboard metrics:
+   - memory_store `news_digest_articles_read` — total articles ever processed
+   - memory_store `news_digest_digests_generated` — total digests created
+   - memory_store `news_digest_last_run` — timestamp
+
+## Guidelines
+
+- NEVER fabricate articles or sources — every headline must come from actual fetch
+- Skip articles more than 48 hours old unless it's a weekly digest
+- Prioritize diverse sources — don't feature 10 articles from the same site
+- For breaking news, feature at the top even if slightly older
+- If a source is unreachable, skip it gracefully and continue
+"""
+
+# Dashboard metrics
+[dashboard]
+[[dashboard.metrics]]
+label = "Articles Read"
+memory_key = "news_digest_articles_read"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Digests Generated"
+memory_key = "news_digest_digests_generated"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Last Run"
+memory_key = "news_digest_last_run"
+format = "text"
+```
+
+### Step 3: Activate the Hand
+
+```bash
+openfang hand activate news-digest
+```
+
+Configure sources:
+
+```bash
+openfang hand config news-digest \
+  --set news_sources="TechCrunch, Hacker News, Ars Technica" \
+  --set digest_frequency="daily" \
+  --set max_articles="10" \
+  --set output_format="markdown"
+```
+
+### Step 4: Test
+
+```
+> Generate a news digest now
+```
+
+The Hand will collect articles, filter, and generate `news_digest_2026-03-06.md`.
+
+## Advanced Features
+
+### External Dependencies
+
+If your Hand requires external tools:
+
+```toml
+[[requires]]
+key = "binary_name"
+label = "Human-readable name"
+requirement_type = "binary"
+check_value = "binary_name"
+description = "Why this is needed"
+
+[requires.install]
+macos = "brew install binary_name"
+windows = "winget install Package.Name"
+linux_apt = "sudo apt install binary_name"
+manual_url = "https://example.com/install"
+estimated_time = "2-5 min"
+```
+
+### API Keys
+
+```toml
+[[requires]]
+key = "API_KEY_NAME"
+label = "Service API Key"
+requirement_type = "api_key"
+check_value = "API_KEY_NAME"
+description = "API key from example.com for feature X"
+
+[requires.install]
+signup_url = "https://example.com/signup"
+docs_url = "https://example.com/docs/api"
+env_example = "API_KEY_NAME=your_key_here"
+estimated_time = "5-10 min"
+steps = [
+    "Sign up at example.com",
+    "Navigate to Settings > API Keys",
+    "Generate new API key",
+    "Set as environment variable: export API_KEY_NAME=...",
+    "Restart OpenFang"
+]
+```
+
+### Settings with Options
+
+```toml
+[[settings]]
+key = "setting_name"
+label = "Display Name"
+description = "What this controls"
+setting_type = "select"  # or "text", "toggle"
+default = "option1"
+
+[[settings.options]]
+value = "option1"
+label = "Option 1 Label"
+
+[[settings.options]]
+value = "option2"
+label = "Option 2 Label"
+```
+
+**Setting types:**
+- `text` — Free text input
+- `select` — Dropdown with predefined options
+- `toggle` — Boolean on/off
+
+### Knowledge Graph Usage
+
+If your Hand tracks entities and relationships:
+
+```javascript
+// In system prompt
+knowledge_add_entity({
+  type: "article",
+  title: "Article Title",
+  url: "https://...",
+  source: "TechCrunch",
+  date: "2026-03-06"
+})
+
+knowledge_add_relation({
+  from: "article_1",
+  to: "topic_ai",
+  type: "about"
+})
+
+// Later, query:
+knowledge_query({entity_type: "article", filters: {source: "TechCrunch"}})
+```
+
+### Event Publishing
+
+If your Hand should notify other systems:
+
+```javascript
+event_publish({
+  type: "news_digest_ready",
+  data: {
+    digest_path: "news_digest_2026-03-06.md",
+    article_count: 10
+  }
+})
+```
+
+## System Prompt Best Practices
+
+<Note>
+**Effective system prompts:**
+
+1. **Start with Phase 0** — Platform detection and state recovery
+2. **Multi-phase structure** — Break workflow into clear phases
+3. **Explicit tools** — Show exact shell commands or tool calls
+4. **Error handling** — Describe what to do when things fail
+5. **Cross-platform** — Handle Windows, macOS, Linux differences
+6. **Examples** — Include concrete examples of outputs
+7. **Guidelines** — End with behavioral rules and edge cases
+</Note>
+
+### Prompt Structure Template
+
+```
+You are [Hand Name] — [one sentence description]
+
+## Phase 0 — Platform Detection & State Recovery (ALWAYS DO THIS FIRST)
+[Detect OS, load state, read config]
+
+## Phase 1 — [Initialization/Setup]
+[First-run setup, schedule creation, etc.]
+
+## Phase 2 — [Core Work Phase 1]
+[Primary task logic]
+
+## Phase 3 — [Core Work Phase 2]
+[Secondary task logic]
+
+## Phase N — State Persistence
+[Save state, update metrics]
+
+## Guidelines
+- Rule 1
+- Rule 2
+- Edge case handling
+```
+
+## Tools Reference
+
+### Available Tools
+
+| Tool | Purpose |
+|------|---------|
+| `shell_exec` | Run shell commands |
+| `file_read` | Read files |
+| `file_write` | Write files |
+| `file_list` | List directory contents |
+| `web_fetch` | Fetch web pages |
+| `web_search` | Search the web |
+| `memory_store` | Store key-value data |
+| `memory_recall` | Retrieve stored data |
+| `knowledge_add_entity` | Add entity to knowledge graph |
+| `knowledge_add_relation` | Add relationship to knowledge graph |
+| `knowledge_query` | Query knowledge graph |
+| `schedule_create` | Create scheduled task |
+| `schedule_list` | List schedules |
+| `schedule_delete` | Delete schedule |
+| `event_publish` | Publish event to event bus |
+| `browser_navigate` | Navigate browser to URL |
+| `browser_click` | Click element in browser |
+| `browser_type` | Type text in browser |
+| `browser_screenshot` | Take browser screenshot |
+| `browser_read_page` | Read current page content |
+| `browser_close` | Close browser session |
+
+Choose only the tools your Hand needs. More tools = larger context = higher cost.
+
+## Testing Your Hand
+
+### Manual Testing
+
+```bash
+# Activate
+openfang hand activate my-hand
+
+# Test basic functionality
+> [Send a test task]
+
+# Check output files
+ls -l *.md *.json
+
+# Verify metrics
+openfang hand stats my-hand
+```
+
+### Iterative Development
+
+1. Start with a minimal system prompt
+2. Test with simple tasks
+3. Add complexity incrementally
+4. Handle errors as they appear
+5. Refine based on actual behavior
+
+### Common Issues
+
+**"Hand doesn't activate"**  
+Check HAND.toml syntax. Ensure `id`, `name`, `description` are present.
+
+**"Tool not found"**  
+Verify tool name in `tools` array matches OpenFang's tool names exactly.
+
+**"Settings not working"**  
+Settings are referenced in system prompt via **User Configuration** section — check the prompt reads them correctly.
+
+**"Metrics not showing"**  
+Ensure `memory_store` calls use the exact key names defined in `[dashboard.metrics]`.
+
+## Real-World Examples
+
+### Email Digest Hand
+
+Reads your inbox, categorizes emails, generates daily summaries.
+
+**Key features:**
+- IMAP integration
+- Email categorization (important, spam, newsletters)
+- Smart summaries
+- Action item extraction
+
+### Backup Hand
+
+Automated backup management with verification.
+
+**Key features:**
+- Schedule-based backups
+- Multiple destinations (local, S3, etc.)
+- Integrity verification
+- Retention policies
+
+### Code Review Hand
+
+Reviews pull requests and provides feedback.
+
+**Key features:**
+- GitHub/GitLab integration
+- Static analysis
+- Best practice checks
+- Automated comments
+
+### Invoice Processing Hand
+
+Extracts data from invoices and updates accounting system.
+
+**Key features:**
+- PDF parsing
+- Data extraction
+- Validation
+- QuickBooks/Xero integration
+
+## Sharing Your Hand
+
+### Publishing
+
+1. Test thoroughly
+2. Write clear documentation in SKILL.md
+3. Add examples to system prompt
+4. Share the directory:
+
+```bash
+# Package your Hand
+tar -czf my-hand.tar.gz ~/.openfang/hands/my-hand/
+
+# Share via GitHub, etc.
+```
+
+### Installation by Others
+
+```bash
+# Download
+wget https://example.com/my-hand.tar.gz
+
+# Extract
+tar -xzf my-hand.tar.gz -C ~/.openfang/hands/
+
+# Activate
+openfang hand activate my-hand
+```
+
+## Tips & Best Practices
+
+<Note>
+**For maintainable Hands:**
+
+- Keep system prompts under 3000 tokens for cost efficiency
+- Use phases for clarity — easier to debug
+- Include examples in prompts — improves reliability
+- Test on all platforms you support (Windows, macOS, Linux)
+- Version your Hand (include version in metadata comments)
+- Document settings thoroughly
+- Provide sensible defaults
+- Handle errors gracefully (don't crash on missing files, network errors, etc.)
+</Note>
+
+<Warning>
+**Safety considerations:**
+
+- Never store credentials in HAND.toml (use environment variables)
+- Validate user inputs before using in shell commands
+- Limit network access to necessary domains
+- Set reasonable max_iterations (prevent runaway loops)
+- Include rate limiting for API calls
+- Warn users about destructive actions (file deletion, etc.)
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browse Existing Hands" icon="compass" href="/hands/overview">
+    Study bundled Hands for inspiration
+  </Card>
+  
+  <Card title="Tool Reference" icon="wrench" href="/integrations/skills">
+    Learn about available tools
+  </Card>
+</CardGroup>
+
+## Community
+
+Share your Hands with the community:
+
+- OpenFang GitHub Discussions
+- Discord server (coming soon)
+- Submit to the official Hand registry
+
+**Questions?** Open an issue on GitHub or check the docs at [opencode.ai](https://opencode.ai/docs).

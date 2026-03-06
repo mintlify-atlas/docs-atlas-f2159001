@@ -1,0 +1,684 @@
+---
+title: "Installation"
+description: "Complete installation guide for OpenFang on macOS, Linux, Windows, and Docker"
+---
+
+## System requirements
+
+OpenFang is a single ~32MB binary with zero runtime dependencies. It runs on:
+
+- **Operating Systems:** macOS (10.15+), Linux (glibc 2.31+), Windows (10/11), Docker
+- **Architectures:** x86_64 (Intel/AMD), ARM64 (Apple Silicon, AWS Graviton)
+- **Memory:** 100MB minimum, 512MB recommended
+- **Disk:** 100MB for binary + data
+- **Network:** Optional (for LLM API calls and channel integrations)
+
+<Note>
+OpenFang can run fully offline if you use a local LLM provider like Ollama.
+</Note>
+
+## Installation methods
+
+Choose the method that works best for your platform:
+
+<CardGroup cols={2}>
+  <Card title="One-line installer" icon="terminal">
+    Recommended for macOS/Linux
+  </Card>
+  <Card title="PowerShell installer" icon="windows">
+    Recommended for Windows
+  </Card>
+  <Card title="Docker" icon="docker">
+    For containerized deployments
+  </Card>
+  <Card title="Build from source" icon="rust">
+    For contributors and custom builds
+  </Card>
+</CardGroup>
+
+---
+
+## macOS installation
+
+### One-line installer (recommended)
+
+The installer downloads the latest pre-built binary, verifies the checksum, and adds it to your PATH.
+
+```bash
+curl -fsSL https://openfang.sh/install | sh
+```
+
+**What it does:**
+1. Detects your architecture (Intel x86_64 or Apple Silicon ARM64)
+2. Downloads the latest release from GitHub
+3. Verifies SHA256 checksum
+4. Installs to `~/.openfang/bin/openfang`
+5. Adds `~/.openfang/bin` to your PATH (in `~/.zshrc` or `~/.bashrc`)
+
+<Tip>
+**Apple Silicon users:** The installer automatically downloads the ARM64 binary optimized for M1/M2/M3 chips.
+</Tip>
+
+### Homebrew (coming soon)
+
+```bash
+brew install openfang
+```
+
+<Note>
+Homebrew formula is in progress. Use the one-line installer for now.
+</Note>
+
+### Verify installation
+
+```bash
+openfang --version
+```
+
+Expected output:
+
+```
+openfang 0.3.24
+```
+
+### Update OpenFang
+
+Re-run the installer to upgrade to the latest version:
+
+```bash
+curl -fsSL https://openfang.sh/install | sh
+```
+
+Or manually download a specific version:
+
+```bash
+export OPENFANG_VERSION=v0.3.24
+curl -fsSL https://openfang.sh/install | sh
+```
+
+---
+
+## Linux installation
+
+### One-line installer (recommended)
+
+Works on Ubuntu, Debian, Fedora, Arch, and most glibc-based distributions:
+
+```bash
+curl -fsSL https://openfang.sh/install | sh
+```
+
+**Supported distributions:**
+- Ubuntu 20.04+ (Focal, Jammy, Noble)
+- Debian 11+ (Bullseye, Bookworm)
+- Fedora 36+
+- Arch Linux (rolling)
+- RHEL/CentOS 8+
+- Amazon Linux 2023
+- Any glibc 2.31+ distribution
+
+### Install to a custom directory
+
+```bash
+export OPENFANG_INSTALL_DIR=/usr/local/bin
+curl -fsSL https://openfang.sh/install | sh
+```
+
+<Warning>
+If you install to a system directory like `/usr/local/bin`, you may need `sudo` privileges.
+</Warning>
+
+### Package managers
+
+<CodeGroup>
+
+```bash APT (Ubuntu/Debian) - coming soon
+sudo apt-get install openfang
+```
+
+```bash DNF (Fedora) - coming soon
+sudo dnf install openfang
+```
+
+```bash Pacman (Arch) - coming soon
+sudo pacman -S openfang
+```
+
+</CodeGroup>
+
+<Note>
+Official packages are in progress. Use the one-line installer for now.
+</Note>
+
+### Verify installation
+
+```bash
+openfang --version
+```
+
+### Add to systemd (run as a service)
+
+Create a systemd service file to run OpenFang automatically on boot:
+
+```bash
+sudo tee /etc/systemd/system/openfang.service > /dev/null <<EOF
+[Unit]
+Description=OpenFang Agent Operating System
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+Environment="GROQ_API_KEY=your_key_here"
+ExecStart=$HOME/.openfang/bin/openfang start
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable openfang
+sudo systemctl start openfang
+```
+
+Check status:
+
+```bash
+sudo systemctl status openfang
+```
+
+---
+
+## Windows installation
+
+### PowerShell installer (recommended)
+
+Run this command in PowerShell (right-click → Run as Administrator if needed):
+
+```powershell
+irm https://openfang.sh/install.ps1 | iex
+```
+
+**What it does:**
+1. Detects your architecture (x64 or ARM64)
+2. Downloads the latest release (.zip)
+3. Verifies SHA256 checksum
+4. Extracts `openfang.exe` to `%USERPROFILE%\.openfang\bin`
+5. Adds the directory to your user PATH
+
+<Tip>
+Restart your terminal (CMD, PowerShell, or Git Bash) after installation for PATH changes to take effect.
+</Tip>
+
+### Windows Subsystem for Linux (WSL)
+
+If you're using WSL2, follow the [Linux installation](#linux-installation) instructions inside your WSL environment.
+
+```bash
+# Inside WSL
+curl -fsSL https://openfang.sh/install | sh
+```
+
+### Verify installation
+
+Open a new PowerShell or CMD window and run:
+
+```cmd
+openfang --version
+```
+
+Expected output:
+
+```
+openfang 0.3.24
+```
+
+### MSI installer (coming soon)
+
+Double-click to install with a GUI wizard:
+
+```
+OpenFang-0.3.24-x64.msi
+```
+
+<Note>
+MSI installer is in development. Use the PowerShell script for now.
+</Note>
+
+### Run as a Windows service
+
+Use [NSSM (Non-Sucking Service Manager)](https://nssm.cc/) to run OpenFang as a background service:
+
+```powershell
+# Download NSSM
+choco install nssm
+
+# Create service
+nssm install OpenFang "C:\Users\YourName\.openfang\bin\openfang.exe" "start"
+nssm set OpenFang AppDirectory "C:\Users\YourName\.openfang"
+nssm set OpenFang AppEnvironmentExtra "GROQ_API_KEY=your_key_here"
+
+# Start service
+nssm start OpenFang
+```
+
+---
+
+## Docker installation
+
+### Official image
+
+Pull the latest OpenFang image from Docker Hub:
+
+```bash
+docker pull rightnow/openfang:latest
+```
+
+### Run OpenFang in a container
+
+Start the daemon with persistent storage:
+
+```bash
+docker run -d \
+  --name openfang \
+  -p 4200:4200 \
+  -v openfang-data:/data \
+  -e GROQ_API_KEY=your_key_here \
+  rightnow/openfang:latest
+```
+
+<Note>
+The `-v openfang-data:/data` volume persists agent configurations, conversations, and memory between container restarts.
+</Note>
+
+### Access the dashboard
+
+Open [http://localhost:4200](http://localhost:4200) in your browser.
+
+### Run a one-off command
+
+Execute OpenFang CLI commands inside the container:
+
+```bash
+docker exec -it openfang openfang agent list
+docker exec -it openfang openfang chat researcher
+```
+
+### Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  openfang:
+    image: rightnow/openfang:latest
+    container_name: openfang
+    ports:
+      - "4200:4200"
+    volumes:
+      - openfang-data:/data
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    restart: unless-stopped
+
+volumes:
+  openfang-data:
+```
+
+Start the service:
+
+```bash
+docker-compose up -d
+```
+
+### Build your own Docker image
+
+Clone the repository and build locally:
+
+```bash
+git clone https://github.com/RightNow-AI/openfang.git
+cd openfang
+docker build -t openfang:custom .
+docker run -d -p 4200:4200 -v openfang-data:/data openfang:custom
+```
+
+---
+
+## Build from source
+
+### Prerequisites
+
+Install Rust 1.75 or later:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup update
+```
+
+### Clone the repository
+
+```bash
+git clone https://github.com/RightNow-AI/openfang.git
+cd openfang
+```
+
+### Build the project
+
+OpenFang is a Cargo workspace with 14 crates:
+
+```bash
+cargo build --release
+```
+
+<Note>
+The first build takes 5-10 minutes because it compiles SQLite (bundled) and Wasmtime. Subsequent builds are incremental and much faster.
+</Note>
+
+### Install the binary
+
+Copy the compiled binary to a directory in your PATH:
+
+```bash
+sudo cp target/release/openfang /usr/local/bin/
+# or
+cp target/release/openfang ~/.openfang/bin/
+```
+
+### Run tests
+
+OpenFang has 1,744+ tests covering all subsystems:
+
+```bash
+cargo test --workspace
+```
+
+### Run clippy (zero warnings policy)
+
+```bash
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+### Development build
+
+For faster compile times during development:
+
+```bash
+cargo build              # Debug build (no optimizations)
+cargo run -- --help      # Run directly without installing
+```
+
+---
+
+## Configuration
+
+After installation, initialize OpenFang:
+
+```bash
+openfang init
+```
+
+This creates:
+
+- `~/.openfang/config.toml` — Main configuration file
+- `~/.openfang/.env` — Environment variables for API keys
+- `~/.openfang/data/openfang.db` — SQLite database
+- `~/.openfang/logs/` — Log files
+
+### Example configuration
+
+`~/.openfang/config.toml`:
+
+```toml
+# API server settings
+api_listen = "127.0.0.1:4200"
+# api_key = "your_secret_key"  # Uncomment to enable auth
+
+[default_model]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[memory]
+decay_rate = 0.05
+
+[network]
+listen_addr = "127.0.0.1:4200"
+```
+
+`~/.openfang/.env`:
+
+```bash
+GROQ_API_KEY=gsk_your_key_here
+ANTHROPIC_API_KEY=sk-ant-your_key_here
+OPENAI_API_KEY=sk-your_key_here
+```
+
+---
+
+## Environment variables
+
+OpenFang respects the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENFANG_HOME` | Data directory | `~/.openfang` |
+| `OPENFANG_LISTEN` | API server bind address | `127.0.0.1:4200` |
+| `OPENFANG_API_KEY` | API authentication key | None (localhost-only) |
+| `RUST_LOG` | Log level | `info` |
+| `GROQ_API_KEY` | Groq API key | None |
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) API key | None |
+| `OPENAI_API_KEY` | OpenAI API key | None |
+| `GEMINI_API_KEY` | Google Gemini API key | None |
+| `OLLAMA_BASE_URL` | Ollama endpoint | `http://localhost:11434` |
+
+Set them in your shell profile or in `~/.openfang/.env` for persistence.
+
+---
+
+## Updating OpenFang
+
+### Update via installer
+
+Re-run the installation script:
+
+<CodeGroup>
+
+```bash macOS/Linux
+curl -fsSL https://openfang.sh/install | sh
+```
+
+```powershell Windows
+irm https://openfang.sh/install.ps1 | iex
+```
+
+</CodeGroup>
+
+### Update Docker image
+
+```bash
+docker pull rightnow/openfang:latest
+docker-compose down
+docker-compose up -d
+```
+
+### Update from source
+
+```bash
+cd openfang
+git pull origin main
+cargo build --release
+sudo cp target/release/openfang /usr/local/bin/
+```
+
+---
+
+## Uninstalling OpenFang
+
+### Remove the binary
+
+<CodeGroup>
+
+```bash macOS/Linux
+rm -rf ~/.openfang
+# Also remove PATH entry from ~/.bashrc or ~/.zshrc
+```
+
+```powershell Windows
+Remove-Item -Recurse -Force "$env:USERPROFILE\.openfang"
+# Also remove PATH entry from user environment variables
+```
+
+</CodeGroup>
+
+### Or use the built-in uninstaller
+
+```bash
+openfang uninstall
+```
+
+This removes:
+- The binary (`~/.openfang/bin/openfang`)
+- Configuration files (`~/.openfang/config.toml`)
+- Database and logs (`~/.openfang/data/`)
+- PATH entries from shell config files
+
+<Warning>
+The uninstaller permanently deletes all agent data, conversations, and memory. Back up `~/.openfang/data/` first if you want to preserve it.
+</Warning>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Installation fails with SSL error" icon="lock">
+The installer requires HTTPS to download from GitHub. Ensure you have up-to-date SSL certificates.
+
+**Fix (Ubuntu/Debian):**
+
+```bash
+sudo apt-get update
+sudo apt-get install ca-certificates
+```
+
+**Fix (macOS):**
+
+```bash
+brew update
+brew upgrade openssl
+```
+</Accordion>
+
+<Accordion title="Permission denied when running openfang" icon="shield">
+The binary may not have execute permissions.
+
+**Fix:**
+
+```bash
+chmod +x ~/.openfang/bin/openfang
+```
+</Accordion>
+
+<Accordion title="Command not found after installation" icon="terminal">
+The installer added `~/.openfang/bin` to your PATH, but you may need to restart your terminal.
+
+**Fix:**
+
+```bash
+# Temporarily add to PATH
+export PATH="$HOME/.openfang/bin:$PATH"
+
+# Or reload your shell config
+source ~/.bashrc  # or ~/.zshrc
+```
+</Accordion>
+
+<Accordion title="Checksum verification failed" icon="warning">
+The download may be corrupted or tampered with.
+
+**Fix:**
+
+```bash
+# Clear cache and retry
+rm -rf /tmp/openfang-install
+curl -fsSL https://openfang.sh/install | sh
+```
+
+If the issue persists, [report it on GitHub](https://github.com/RightNow-AI/openfang/issues).
+</Accordion>
+
+<Accordion title="Docker container exits immediately" icon="docker">
+Check the container logs for errors:
+
+```bash
+docker logs openfang
+```
+
+Common causes:
+- Missing API key: Add `-e GROQ_API_KEY=...` to the `docker run` command
+- Port conflict: Change `-p 4200:4200` to `-p 5000:4200`
+</Accordion>
+
+<Accordion title="Build from source fails" icon="rust">
+Ensure you have Rust 1.75+ installed:
+
+```bash
+rustc --version
+rustup update
+```
+
+If the build fails, check [CONTRIBUTING.md](https://github.com/RightNow-AI/openfang/blob/main/CONTRIBUTING.md) for detailed build instructions.
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Next steps
+
+Now that OpenFang is installed, continue with the [Quickstart](/quickstart) to:
+
+- Initialize configuration with `openfang init`
+- Start the daemon with `openfang start`
+- Spawn your first agent with `openfang agent spawn researcher`
+- Chat with the agent using `openfang chat researcher`
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Get your first agent running in 5 minutes
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure models, channels, and security
+  </Card>
+  <Card title="Creating Agents" icon="robot" href="/guides/creating-agents">
+    Create custom agents with templates
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Integrate OpenFang programmatically
+  </Card>
+</CardGroup>
+
+## Get help
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/sSJqgNnq6X">
+    Ask questions and get support
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/RightNow-AI/openfang/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Twitter/X" icon="twitter" href="https://x.com/openfangg">
+    Follow for updates
+  </Card>
+</CardGroup>

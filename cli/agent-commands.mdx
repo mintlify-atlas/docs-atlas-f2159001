@@ -1,0 +1,551 @@
+---
+title: Agent Commands
+description: Create, manage, and interact with AI agents from the command line
+---
+
+# Agent Commands
+
+All agent commands are under the `openfang agent` namespace.
+
+## Creating Agents
+
+### openfang agent new
+
+Spawn an agent from a built-in template.
+
+```bash
+openfang agent new [<TEMPLATE>]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<TEMPLATE>` | Template name (e.g. `coder`, `assistant`, `researcher`). If omitted, displays an interactive picker. |
+
+**Behavior:**
+
+- Templates are discovered from:
+  - Repository `agents/` directory (dev builds)
+  - `~/.openfang/agents/` (installed)
+  - `OPENFANG_AGENTS_DIR` (environment override)
+- Each template is a directory containing an `agent.toml` manifest
+- In daemon mode: sends `POST /api/agents` with the manifest (agent is persistent)
+- In standalone mode: boots an in-process kernel (agent is ephemeral)
+
+**Example:**
+
+<CodeGroup>
+```bash Interactive Picker
+$ openfang agent new
+
+  Select an agent template:
+
+  > coder          - Code generation and review
+    assistant      - General-purpose assistant
+    researcher     - Web research and analysis
+    writer         - Content creation
+    analyst        - Data analysis
+
+  Use ↑↓ to navigate, Enter to select, Esc to cancel
+```
+
+```bash Direct Creation
+$ openfang agent new coder
+[ok] Agent spawned: coder (a1b2c3d4-e5f6-7890-abcd-ef1234567890)
+hint: Chat with this agent: openfang agent chat a1b2c3d4
+```
+</CodeGroup>
+
+<Note>
+  Agents spawned in daemon mode persist across restarts. Agents spawned in standalone mode are ephemeral.
+</Note>
+
+### openfang agent spawn
+
+Spawn an agent from a custom manifest file.
+
+```bash
+openfang agent spawn <MANIFEST>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<MANIFEST>` | Path to an agent manifest TOML file |
+
+**Behavior:**
+
+1. Reads and parses the TOML manifest file
+2. In daemon mode: sends the raw TOML to `POST /api/agents`
+3. In standalone mode: boots an in-process kernel and spawns the agent locally
+
+**Example Manifest:**
+
+```toml
+# my-agent/agent.toml
+name = "custom-agent"
+role = "A specialized agent for code review"
+
+[model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[skills]
+enabled = ["code-reviewer", "git-expert"]
+
+[instructions]
+system_prompt = """
+You are an expert code reviewer. Focus on:
+- Security vulnerabilities
+- Performance issues
+- Best practices
+- Code maintainability
+"""
+```
+
+**Spawn the Custom Agent:**
+
+```bash
+$ openfang agent spawn ./my-agent/agent.toml
+[ok] Agent spawned: custom-agent (e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0)
+```
+
+<Warning>
+  The manifest file must be valid TOML and conform to the OpenFang agent schema.
+</Warning>
+
+## Listing Agents
+
+### openfang agent list
+
+List all running agents.
+
+```bash
+openfang agent list [--json]
+```
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--json` | Output as JSON array for scripting |
+
+**Example Output (Daemon Mode):**
+
+```bash
+$ openfang agent list
+
+  Active Agents
+
+  ID                                    NAME          STATE       PROVIDER    MODEL
+  a1b2c3d4-e5f6-7890-abcd-ef1234567890  coder         idle        anthropic   claude-sonnet-4
+  e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0  assistant     processing  groq        llama-3.3-70b
+  i9j0k1l2-m3n4-o5p6-q7r8-s9t0u1v2w3x4  researcher    idle        gemini      gemini-2.5-flash
+
+  Total: 3 agents
+```
+
+**Example Output (In-Process Mode):**
+
+```bash
+$ openfang agent list
+
+  Active Agents (in-process kernel)
+
+  ID                                    NAME        STATE   CREATED
+  a1b2c3d4-e5f6-7890-abcd-ef1234567890  coder       idle    2025-03-06 10:30:15
+
+  Total: 1 agent
+  hint: This agent is ephemeral. Start daemon for persistence: openfang start
+```
+
+### JSON Output
+
+```bash
+$ openfang agent list --json
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "coder",
+    "state": "idle",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "created_at": "2025-03-06T10:30:15Z"
+  },
+  {
+    "id": "e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0",
+    "name": "assistant",
+    "state": "processing",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "created_at": "2025-03-06T11:15:42Z"
+  }
+]
+```
+
+**Scripting Example:**
+
+```bash
+# Get all agent IDs
+openfang agent list --json | jq -r '.[].id'
+
+# Count agents by provider
+openfang agent list --json | jq 'group_by(.provider) | map({provider: .[0].provider, count: length})'
+
+# Find agents by state
+openfang agent list --json | jq '.[] | select(.state == "idle")'
+```
+
+## Interactive Chat
+
+### openfang agent chat
+
+Start an interactive chat session with a specific agent.
+
+```bash
+openfang agent chat <AGENT_ID>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<AGENT_ID>` | Agent UUID (obtain from `openfang agent list`) |
+
+**Behavior:**
+
+- Opens a REPL-style chat loop
+- Type messages at the `you>` prompt
+- Agent responses display at the `agent>` prompt
+- Shows token usage and iteration count after each response
+- Type `exit`, `quit`, or press `Ctrl+C` to end the session
+
+**Example Session:**
+
+```bash
+$ openfang agent chat a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+  Chat with: coder
+  Type 'exit' or 'quit' to end. Press Ctrl+C to interrupt.
+
+you> Write a function to calculate Fibonacci numbers
+
+agent> Here's an efficient implementation using dynamic programming:
+
+```python
+def fibonacci(n):
+    if n <= 1:
+        return n
+    a, b = 0, 1
+    for _ in range(2, n + 1):
+        a, b = b, a + b
+    return b
+```
+
+This runs in O(n) time and O(1) space.
+
+  [tokens: 245 | iterations: 1]
+
+you> Now optimize it with memoization
+
+agent> Here's the memoized version:
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+```
+
+The `@lru_cache` decorator automatically caches results.
+
+  [tokens: 189 | iterations: 1]
+
+you> exit
+
+  Session ended.
+```
+
+<Note>
+  Chat sessions support multi-turn conversations with full context retention.
+</Note>
+
+### Quick Chat Shortcut
+
+For convenience, you can use `openfang chat` as a shortcut:
+
+```bash
+# Chat with the default agent
+openfang chat
+
+# Chat with a specific agent by name
+openfang chat coder
+
+# Chat with a specific agent by UUID
+openfang chat a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+## One-Shot Messages
+
+### openfang message
+
+Send a single message to an agent without entering interactive mode.
+
+```bash
+openfang message <AGENT> <TEXT> [--json]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<AGENT>` | Agent name or UUID |
+| `<TEXT>` | Message text |
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--json` | Output as JSON for scripting |
+
+**Example:**
+
+```bash
+$ openfang message coder "Explain async/await in JavaScript"
+
+  coder:
+
+  async/await is syntactic sugar for Promises:
+
+  - `async` function always returns a Promise
+  - `await` pauses execution until Promise resolves
+  - Makes async code look synchronous
+
+  Example:
+  ```javascript
+  async function fetchData() {
+    const response = await fetch('/api/data');
+    const data = await response.json();
+    return data;
+  }
+  ```
+
+  [tokens: 312 | iterations: 1]
+```
+
+**JSON Output:**
+
+```bash
+$ openfang message coder "What is CORS?" --json
+{
+  "agent": "coder",
+  "response": "CORS (Cross-Origin Resource Sharing) is a security...",
+  "tokens": 425,
+  "iterations": 1
+}
+```
+
+## Agent Lifecycle Management
+
+### openfang agent kill
+
+Terminate a running agent.
+
+```bash
+openfang agent kill <AGENT_ID>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<AGENT_ID>` | Agent UUID to terminate |
+
+**Example:**
+
+```bash
+$ openfang agent kill a1b2c3d4-e5f6-7890-abcd-ef1234567890
+[ok] Agent terminated: coder
+```
+
+<Warning>
+  Killing an agent permanently deletes it. This action cannot be undone.
+</Warning>
+
+### openfang agent set
+
+Modify agent properties (currently supports model changes).
+
+```bash
+openfang agent set <AGENT_ID> <FIELD> <VALUE>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<AGENT_ID>` | Agent UUID |
+| `<FIELD>` | Field to set (currently only `model`) |
+| `<VALUE>` | New value |
+
+**Example:**
+
+```bash
+# Switch agent to a different model
+$ openfang agent set a1b2c3d4 model gpt-4o
+[ok] Updated agent model to: gpt-4o
+
+# Verify the change
+$ openfang agent list
+  ID          NAME    STATE   PROVIDER   MODEL
+  a1b2c3d4... coder   idle    openai     gpt-4o
+```
+
+## Session Management
+
+### openfang sessions
+
+List conversation sessions for agents.
+
+```bash
+openfang sessions [<AGENT>] [--json]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `<AGENT>` | Optional agent name or ID to filter by |
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--json` | Output as JSON for scripting |
+
+**Example:**
+
+```bash
+$ openfang sessions coder
+
+  Sessions for: coder
+
+  SESSION ID                            STARTED             MESSAGES  LAST ACTIVITY
+  s1a2b3c4-d5e6-f7g8-h9i0-j1k2l3m4n5o6  2025-03-06 10:30   45        2 hours ago
+  s2b3c4d5-e6f7-g8h9-i0j1-k2l3m4n5o6p7  2025-03-05 14:20   12        1 day ago
+
+  Total: 2 sessions
+```
+
+**All Sessions:**
+
+```bash
+$ openfang sessions
+
+  All Sessions
+
+  AGENT       SESSION ID        STARTED             MESSAGES
+  coder       s1a2b3c4...       2025-03-06 10:30   45
+  coder       s2b3c4d5...       2025-03-05 14:20   12
+  assistant   s3c4d5e6...       2025-03-06 09:15   23
+
+  Total: 3 sessions
+```
+
+## Agent Templates
+
+OpenFang includes several built-in agent templates:
+
+### Built-in Templates
+
+| Template | Description | Recommended Model |
+|---|---|---|
+| `assistant` | General-purpose assistant for everyday tasks | `gpt-4o`, `claude-sonnet-4` |
+| `coder` | Code generation, review, and debugging | `claude-sonnet-4`, `gpt-4o` |
+| `researcher` | Web research and information gathering | `gemini-2.5-flash`, `perplexity` |
+| `writer` | Content creation and editing | `claude-sonnet-4`, `gpt-4o` |
+| `analyst` | Data analysis and visualization | `gpt-4o`, `gemini-2.5-flash` |
+| `debugger` | Advanced debugging and error analysis | `claude-sonnet-4`, `deepseek-chat` |
+| `architect` | System design and architecture planning | `claude-sonnet-4`, `gpt-4o` |
+
+### Custom Templates
+
+Create custom agent templates in `~/.openfang/agents/`:
+
+```bash
+~/.openfang/agents/
+  my-agent/
+    agent.toml      # Manifest
+    README.md       # Optional documentation
+    skills/         # Optional bundled skills
+```
+
+**Example Custom Template:**
+
+```toml
+# ~/.openfang/agents/my-agent/agent.toml
+name = "my-agent"
+role = "Custom role description"
+
+[model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+max_tokens = 4096
+temperature = 0.7
+
+[skills]
+enabled = ["web-search", "code-reviewer"]
+
+[instructions]
+system_prompt = "You are a helpful assistant specialized in..."
+
+[memory]
+max_context_messages = 50
+retention_days = 30
+```
+
+## Advanced Usage
+
+### Batch Agent Creation
+
+```bash
+# Spawn multiple agents from a list
+for template in coder analyst researcher; do
+  openfang agent new $template
+done
+```
+
+### Agent Health Monitoring
+
+```bash
+# Check for idle agents
+openfang agent list --json | jq '.[] | select(.state == "idle") | .name'
+
+# Count agents by state
+openfang agent list --json | jq 'group_by(.state) | map({state: .[0].state, count: length})'
+```
+
+### Clean Up Stale Agents
+
+```bash
+# Kill all idle agents
+for id in $(openfang agent list --json | jq -r '.[] | select(.state == "idle") | .id'); do
+  openfang agent kill $id
+done
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Commands" icon="diagram-project" href="/cli/workflow-commands">
+    Orchestrate multi-step agent workflows
+  </Card>
+  <Card title="Skill Commands" icon="puzzle-piece" href="/cli/skill-commands">
+    Install and manage agent skills
+  </Card>
+</CardGroup>

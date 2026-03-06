@@ -1,0 +1,617 @@
+---
+title: LLM Providers
+description: Complete reference for configuring all 27 LLM providers in OpenFang
+---
+
+OpenFang supports 27 LLM providers spanning cloud APIs, self-hosted solutions, and specialized coding assistants. Each provider is configured via environment variables for API keys and optional TOML settings for custom endpoints.
+
+## Provider List
+
+OpenFang supports these providers out of the box:
+
+<CardGroup cols={3}>
+  <Card title="Anthropic" icon="a">Claude Opus/Sonnet/Haiku</Card>
+  <Card title="OpenAI" icon="o">GPT-4o, GPT-4, o1, o3</Card>
+  <Card title="Google" icon="g">Gemini 2.0 Flash/Pro</Card>
+  <Card title="Groq" icon="bolt">Ultra-fast inference</Card>
+  <Card title="DeepSeek" icon="code">Coding specialists</Card>
+  <Card title="xAI" icon="x">Grok models</Card>
+  <Card title="OpenRouter" icon="route">Multi-provider routing</Card>
+  <Card title="Mistral" icon="m">European open models</Card>
+  <Card title="Together AI" icon="rocket">Open source models</Card>
+  <Card title="Fireworks" icon="fire">Fast open models</Card>
+  <Card title="Cohere" icon="c">Command R+</Card>
+  <Card title="Perplexity" icon="search">Search-augmented LLMs</Card>
+  <Card title="AI21 Labs" icon="j">Jamba models</Card>
+  <Card title="Cerebras" icon="chip">Fastest inference</Card>
+  <Card title="SambaNova" icon="s">Enterprise inference</Card>
+  <Card title="Hugging Face" icon="hugging-face">70k+ models</Card>
+  <Card title="Replicate" icon="copy">Cloud model hosting</Card>
+  <Card title="Ollama" icon="home">Local models</Card>
+  <Card title="vLLM" icon="server">Self-hosted inference</Card>
+  <Card title="LM Studio" icon="desktop">Desktop inference</Card>
+  <Card title="Qwen" icon="alibaba">Alibaba models</Card>
+  <Card title="MiniMax" icon="mini">Chinese frontier</Card>
+  <Card title="Zhipu AI" icon="glm">GLM models</Card>
+  <Card title="Moonshot" icon="moon">Kimi long context</Card>
+  <Card title="Qianfan" icon="baidu">Baidu ERNIE</Card>
+  <Card title="Bedrock" icon="aws">AWS hosted models</Card>
+  <Card title="GitHub Copilot" icon="github">Copilot API</Card>
+</CardGroup>
+
+## Quick Setup
+
+### 1. Anthropic (Claude)
+
+<CodeGroup>
+```bash Environment
+export ANTHROPIC_API_KEY="sk-ant-api03-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `claude-opus-4-20250514`, `claude-sonnet-4-20250514`, `claude-haiku-4.5-20251001`, `claude-opus-4.6`, `claude-sonnet-4.6`
+
+**API Key**: Get from [console.anthropic.com](https://console.anthropic.com)
+
+---
+
+### 2. OpenAI
+
+<CodeGroup>
+```bash Environment
+export OPENAI_API_KEY="sk-proj-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-4`, `o1`, `o1-mini`, `o3-mini`, `gpt-3.5-turbo`
+
+**API Key**: Get from [platform.openai.com](https://platform.openai.com)
+
+---
+
+### 3. Google Gemini
+
+<CodeGroup>
+```bash Environment
+export GEMINI_API_KEY="AIza..."
+# or
+export GOOGLE_API_KEY="AIza..."
+```
+
+```toml config.toml
+[default_model]
+provider = "gemini"
+model = "gemini-2.0-flash-exp"
+api_key_env = "GEMINI_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `gemini-2.0-flash-exp`, `gemini-2.0-flash-thinking-exp`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-exp-1206`
+
+**API Key**: Get from [aistudio.google.com](https://aistudio.google.com)
+
+---
+
+### 4. Groq
+
+<CodeGroup>
+```bash Environment
+export GROQ_API_KEY="gsk_..."
+```
+
+```toml config.toml
+[default_model]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `llama-3.3-70b-versatile`, `llama-3.1-70b-versatile`, `llama-3.2-90b-vision-preview`, `mixtral-8x7b-32768`
+
+**API Key**: Get from [console.groq.com](https://console.groq.com)
+
+**Free Tier**: 30 requests/minute, 7,000 requests/day
+
+---
+
+### 5. DeepSeek
+
+<CodeGroup>
+```bash Environment
+export DEEPSEEK_API_KEY="sk-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "deepseek"
+model = "deepseek-chat"
+api_key_env = "DEEPSEEK_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `deepseek-chat`, `deepseek-reasoner`, `deepseek-coder`
+
+**API Key**: Get from [platform.deepseek.com](https://platform.deepseek.com)
+
+---
+
+### 6. Ollama (Local)
+
+<CodeGroup>
+```bash Setup
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3.2
+```
+
+```toml config.toml
+[default_model]
+provider = "ollama"
+model = "llama3.2:latest"
+# No API key needed for local Ollama
+
+# Optional: custom endpoint
+[provider_urls]
+ollama = "http://gpu-server.local:11434"
+```
+</CodeGroup>
+
+**No API Key Required**: Ollama runs locally on your machine.
+
+**Available Models**: Any model from [ollama.com/library](https://ollama.com/library) - `llama3.2`, `mistral`, `codellama`, `qwen2.5`, etc.
+
+---
+
+### 7. OpenRouter
+
+<CodeGroup>
+```bash Environment
+export OPENROUTER_API_KEY="sk-or-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "openrouter"
+model = "anthropic/claude-sonnet-4"
+api_key_env = "OPENROUTER_API_KEY"
+```
+</CodeGroup>
+
+**API Key**: Get from [openrouter.ai/keys](https://openrouter.ai/keys)
+
+**Benefits**: Access 100+ models through a single API, automatic failover, cost optimization
+
+---
+
+### 8. xAI (Grok)
+
+<CodeGroup>
+```bash Environment
+export XAI_API_KEY="xai-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "xai"
+model = "grok-beta"
+api_key_env = "XAI_API_KEY"
+```
+</CodeGroup>
+
+**Available Models**: `grok-beta`, `grok-vision-beta`
+
+**API Key**: Get from [console.x.ai](https://console.x.ai)
+
+---
+
+## Chinese Providers
+
+### Qwen (Alibaba)
+
+<CodeGroup>
+```bash Environment
+export DASHSCOPE_API_KEY="sk-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "qwen"
+model = "qwen-plus"
+api_key_env = "DASHSCOPE_API_KEY"
+```
+</CodeGroup>
+
+**Models**: `qwen-max`, `qwen-plus`, `qwen-turbo`, `qwen3-235b-a22b`, `qwen-vl-plus`, `qwen-coder-plus`
+
+---
+
+### Zhipu AI (GLM)
+
+<CodeGroup>
+```bash Environment
+export ZHIPU_API_KEY="..."
+```
+
+```toml config.toml
+[default_model]
+provider = "zhipu"
+model = "glm-4-plus"
+api_key_env = "ZHIPU_API_KEY"
+```
+</CodeGroup>
+
+**Models**: `glm-4-plus`, `glm-4-flash`, `glm-5-20250605`, `glm-4v-plus`, `codegeex-4`
+
+---
+
+### MiniMax
+
+<CodeGroup>
+```bash Environment
+export MINIMAX_API_KEY="..."
+```
+
+```toml config.toml
+[default_model]
+provider = "minimax"
+model = "MiniMax-M2.5"
+api_key_env = "MINIMAX_API_KEY"
+```
+</CodeGroup>
+
+**Models**: `MiniMax-M2.5`, `MiniMax-M2.1`, `minimax-text-01`, `abab6.5-chat`
+
+**Context**: Up to 1M tokens
+
+---
+
+### Moonshot (Kimi)
+
+<CodeGroup>
+```bash Environment
+export MOONSHOT_API_KEY="sk-..."
+```
+
+```toml config.toml
+[default_model]
+provider = "moonshot"
+model = "moonshot-v1-128k"
+api_key_env = "MOONSHOT_API_KEY"
+```
+</CodeGroup>
+
+**Models**: `moonshot-v1-128k`, `moonshot-v1-32k`, `moonshot-v1-8k`
+
+---
+
+### Baidu Qianfan (ERNIE)
+
+<CodeGroup>
+```bash Environment
+export QIANFAN_API_KEY="..."
+```
+
+```toml config.toml
+[default_model]
+provider = "qianfan"
+model = "ernie-4.5-8k"
+api_key_env = "QIANFAN_API_KEY"
+```
+</CodeGroup>
+
+**Models**: `ernie-4.5-8k`, `ernie-4.0-turbo-8k`, `ernie-speed-128k`
+
+---
+
+## Self-Hosted & Local
+
+### vLLM
+
+<CodeGroup>
+```bash Start vLLM Server
+python -m vllm.entrypoints.openai.api_server \
+  --model meta-llama/Llama-3.3-70B-Instruct \
+  --port 8000
+```
+
+```toml config.toml
+[default_model]
+provider = "vllm"
+model = "meta-llama/Llama-3.3-70B-Instruct"
+
+[provider_urls]
+vllm = "http://localhost:8000/v1"
+```
+</CodeGroup>
+
+**No API Key Required** for local deployment.
+
+---
+
+### LM Studio
+
+<CodeGroup>
+```toml config.toml
+[default_model]
+provider = "lmstudio"
+model = "llama-3.3-70b"
+
+[provider_urls]
+lmstudio = "http://localhost:1234/v1"
+```
+</CodeGroup>
+
+1. Download [LM Studio](https://lmstudio.ai)
+2. Load a model (e.g., Llama 3.3 70B)
+3. Start local server (default port 1234)
+4. Configure OpenFang to use it
+
+---
+
+## Enterprise & Cloud
+
+### AWS Bedrock
+
+<CodeGroup>
+```bash Environment
+export AWS_ACCESS_KEY_ID="AKIA..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_REGION="us-east-1"
+```
+
+```toml config.toml
+[default_model]
+provider = "bedrock"
+model = "bedrock/anthropic.claude-sonnet-4-6"
+api_key_env = "AWS_ACCESS_KEY_ID"
+```
+</CodeGroup>
+
+**Available Models**: `bedrock/anthropic.claude-opus-4-6`, `bedrock/anthropic.claude-sonnet-4-6`, `bedrock/amazon.nova-pro-v1:0`, `bedrock/meta.llama3-3-70b-instruct-v1:0`
+
+---
+
+### GitHub Copilot
+
+<CodeGroup>
+```bash Environment
+export GITHUB_TOKEN="ghp_..."
+```
+
+```toml config.toml
+[default_model]
+provider = "github-copilot"
+model = "gpt-4o-copilot"
+api_key_env = "GITHUB_TOKEN"
+```
+</CodeGroup>
+
+**Requires**: Active GitHub Copilot subscription
+
+---
+
+## Additional Providers
+
+### Mistral AI
+
+```bash
+export MISTRAL_API_KEY="..."
+```
+
+**Models**: `mistral-large`, `mistral-medium`, `mistral-small`, `codestral`
+
+---
+
+### Together AI
+
+```bash
+export TOGETHER_API_KEY="..."
+```
+
+**Models**: Open source models like Llama, Mixtral, Qwen via fast inference
+
+---
+
+### Fireworks AI
+
+```bash
+export FIREWORKS_API_KEY="..."
+```
+
+**Models**: Ultra-fast inference for Llama, Mixtral, DeepSeek
+
+---
+
+### Cohere
+
+```bash
+export COHERE_API_KEY="..."
+```
+
+**Models**: `command-r-plus`, `command-r`, `command`
+
+---
+
+### Perplexity
+
+```bash
+export PERPLEXITY_API_KEY="pplx-..."
+```
+
+**Models**: `sonar`, `sonar-pro` - search-augmented responses
+
+---
+
+### AI21 Labs
+
+```bash
+export AI21_API_KEY="..."
+```
+
+**Models**: `jamba-1.5-large`, `jamba-1.5-mini`
+
+---
+
+### Cerebras
+
+```bash
+export CEREBRAS_API_KEY="..."
+```
+
+**Models**: World's fastest inference (2,000+ tokens/sec)
+
+---
+
+### SambaNova
+
+```bash
+export SAMBANOVA_API_KEY="..."
+```
+
+**Models**: Enterprise-grade inference platform
+
+---
+
+### Hugging Face
+
+```bash
+export HF_API_KEY="hf_..."
+```
+
+**Models**: 70,000+ models via Inference API
+
+---
+
+### Replicate
+
+```bash
+export REPLICATE_API_TOKEN="r8_..."
+```
+
+**Models**: Cloud-hosted open source models
+
+---
+
+## Custom Provider URLs
+
+Override any provider's base URL:
+
+```toml
+[provider_urls]
+openai = "https://api.openai.com/v1"           # Default
+anthropic = "https://my-proxy.com/anthropic"   # Custom proxy
+ollama = "http://192.168.1.100:11434"          # Remote Ollama
+vllm = "http://gpu-cluster.internal:8000/v1"   # Internal vLLM
+```
+
+## Provider Status Check
+
+Check which providers are configured:
+
+```bash
+# List all providers and their status
+openfang providers status
+
+# Test a specific provider
+openfang providers test anthropic
+
+# List models from a provider
+openfang models list --provider anthropic
+```
+
+## Multi-Provider Strategy
+
+<CodeGroup>
+```toml Cost-Optimized
+[default_model]
+provider = "groq"  # Free tier
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[[fallback_providers]]
+provider = "ollama"  # Local fallback
+model = "llama3.2:latest"
+```
+
+```toml Performance-First
+[default_model]
+provider = "anthropic"
+model = "claude-opus-4-20250514"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[[fallback_providers]]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+```
+
+```toml Privacy-Focused
+[default_model]
+provider = "ollama"
+model = "llama3.2:latest"
+
+[[fallback_providers]]
+provider = "lmstudio"
+model = "mistral-7b"
+```
+</CodeGroup>
+
+## Troubleshooting
+
+### Authentication Errors
+
+```bash
+# Verify API key is set
+echo $ANTHROPIC_API_KEY
+
+# Test provider connection
+openfang providers test anthropic
+```
+
+### Rate Limits
+
+Configure fallback providers to handle rate limits:
+
+```toml
+[[fallback_providers]]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+```
+
+### Model Not Found
+
+```bash
+# List all models from provider
+openfang models list --provider anthropic
+
+# Check if provider is configured
+openfang providers status
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Configuration" icon="brain" href="/configuration/models">
+    Configure model routing and fallbacks
+  </Card>
+  <Card title="Channel Setup" icon="message" href="/configuration/channels">
+    Connect messaging platforms
+  </Card>
+</CardGroup>

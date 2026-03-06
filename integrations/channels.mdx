@@ -1,0 +1,584 @@
+---
+title: Channel Adapters
+description: Connect OpenFang to 40 messaging platforms and communication channels
+---
+
+OpenFang connects to messaging platforms through **40 channel adapters**, allowing users to interact with their agents across every major communication platform. Adapters span consumer messaging, enterprise collaboration, social media, community platforms, privacy-focused protocols, and generic webhooks.
+
+## Common Features
+
+All adapters share a common foundation:
+
+<CardGroup cols={2}>
+  <Card title="Graceful Shutdown" icon="power-off">
+    Coordinated shutdown via watch channel
+  </Card>
+  <Card title="Resilient Connections" icon="arrows-rotate">
+    Exponential backoff on connection failures
+  </Card>
+  <Card title="Secret Management" icon="lock">
+    Zeroizing strings for secure token handling
+  </Card>
+  <Card title="Message Splitting" icon="scissors">
+    Automatic splitting for platform limits
+  </Card>
+  <Card title="Flexible Overrides" icon="sliders">
+    Per-channel model and prompt customization
+  </Card>
+  <Card title="Policy Enforcement" icon="shield">
+    DM/group policy control per channel
+  </Card>
+  <Card title="Rate Limiting" icon="gauge">
+    Per-user rate limiting protection
+  </Card>
+  <Card title="Format Support" icon="file-code">
+    Markdown, Telegram HTML, Slack Mrkdwn, plain text
+  </Card>
+</CardGroup>
+
+## All 40 Channels
+
+### Core Platforms (7)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Telegram** | Bot API long-polling | `TELEGRAM_BOT_TOKEN` | `Telegram` |
+| **Discord** | Gateway WebSocket v10 | `DISCORD_BOT_TOKEN` | `Discord` |
+| **Slack** | Socket Mode WebSocket | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | `Slack` |
+| **WhatsApp** | Cloud API webhook | `WA_ACCESS_TOKEN`, `WA_PHONE_ID`, `WA_VERIFY_TOKEN` | `WhatsApp` |
+| **Signal** | signal-cli REST/JSON-RPC | _(system service)_ | `Signal` |
+| **Matrix** | Client-Server API /sync | `MATRIX_TOKEN` | `Matrix` |
+| **Email** | IMAP + SMTP | `EMAIL_PASSWORD` | `Email` |
+
+### Enterprise (8)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Microsoft Teams** | Bot Framework v3 webhook + OAuth2 | `TEAMS_APP_ID`, `TEAMS_APP_SECRET` | `Teams` |
+| **Mattermost** | WebSocket + REST v4 | `MATTERMOST_TOKEN`, `MATTERMOST_URL` | `Mattermost` |
+| **Google Chat** | Service account webhook | `GOOGLE_CHAT_SA_KEY`, `GOOGLE_CHAT_SPACE` | `Custom("google_chat")` |
+| **Webex** | Bot SDK WebSocket | `WEBEX_BOT_TOKEN` | `Custom("webex")` |
+| **Feishu / Lark** | Open Platform webhook | `FEISHU_APP_ID`, `FEISHU_APP_SECRET` | `Custom("feishu")` |
+| **Rocket.Chat** | REST polling | `ROCKETCHAT_TOKEN`, `ROCKETCHAT_URL` | `Custom("rocketchat")` |
+| **Zulip** | Event queue long-polling | `ZULIP_EMAIL`, `ZULIP_API_KEY`, `ZULIP_URL` | `Custom("zulip")` |
+| **XMPP** | XMPP protocol | `XMPP_JID`, `XMPP_PASSWORD`, `XMPP_SERVER` | `Custom("xmpp")` |
+
+### Social Media (8)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **LINE** | Messaging API webhook | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_TOKEN` | `Custom("line")` |
+| **Viber** | Bot API webhook | `VIBER_AUTH_TOKEN` | `Custom("viber")` |
+| **Facebook Messenger** | Platform API webhook | `MESSENGER_PAGE_TOKEN`, `MESSENGER_VERIFY_TOKEN` | `Custom("messenger")` |
+| **Mastodon** | Streaming API WebSocket | `MASTODON_TOKEN`, `MASTODON_INSTANCE` | `Custom("mastodon")` |
+| **Bluesky** | AT Protocol WebSocket | `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` | `Custom("bluesky")` |
+| **Reddit** | OAuth2 polling | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` | `Custom("reddit")` |
+| **LinkedIn** | Messaging API polling | `LINKEDIN_ACCESS_TOKEN` | `Custom("linkedin")` |
+| **Twitch** | IRC gateway | `TWITCH_TOKEN`, `TWITCH_CHANNEL` | `Custom("twitch")` |
+
+### Community Platforms (6)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **IRC** | Raw TCP PRIVMSG | `IRC_SERVER`, `IRC_NICK`, `IRC_PASSWORD` | `Custom("irc")` |
+| **Guilded** | WebSocket | `GUILDED_BOT_TOKEN` | `Custom("guilded")` |
+| **Revolt** | WebSocket | `REVOLT_BOT_TOKEN` | `Custom("revolt")` |
+| **Keybase** | Bot API polling | `KEYBASE_USERNAME`, `KEYBASE_PAPERKEY` | `Custom("keybase")` |
+| **Discourse** | REST polling | `DISCOURSE_API_KEY`, `DISCOURSE_URL` | `Custom("discourse")` |
+| **Gitter** | Streaming API | `GITTER_TOKEN` | `Custom("gitter")` |
+
+### Self-Hosted (1)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Nextcloud Talk** | REST polling | `NEXTCLOUD_TOKEN`, `NEXTCLOUD_URL` | `Custom("nextcloud")` |
+
+### Privacy-Focused (3)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Threema** | Gateway API webhook | `THREEMA_ID`, `THREEMA_SECRET` | `Custom("threema")` |
+| **Nostr** | NIP-01 relay WebSocket | `NOSTR_PRIVATE_KEY`, `NOSTR_RELAY` | `Custom("nostr")` |
+| **Mumble** | TCP text protocol | `MUMBLE_SERVER`, `MUMBLE_USERNAME`, `MUMBLE_PASSWORD` | `Custom("mumble")` |
+
+### Workplace (4)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Pumble** | Webhook | `PUMBLE_WEBHOOK_URL`, `PUMBLE_TOKEN` | `Custom("pumble")` |
+| **Flock** | Webhook | `FLOCK_TOKEN` | `Custom("flock")` |
+| **Twist** | API v3 polling | `TWIST_TOKEN` | `Custom("twist")` |
+| **DingTalk** | Robot API webhook | `DINGTALK_TOKEN`, `DINGTALK_SECRET` | `Custom("dingtalk")` |
+
+### Notification Services (2)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **ntfy** | SSE pub/sub | `NTFY_TOPIC`, `NTFY_SERVER` | `Custom("ntfy")` |
+| **Gotify** | WebSocket | `GOTIFY_TOKEN`, `GOTIFY_URL` | `Custom("gotify")` |
+
+### Integration (1)
+
+| Channel | Protocol | Environment Variables | Type |
+|---------|----------|----------------------|------|
+| **Webhook** | Generic HTTP with HMAC-SHA256 | `WEBHOOK_URL`, `WEBHOOK_SECRET` | `Custom("webhook")` |
+
+## Channel Configuration
+
+All channel configurations live in `~/.openfang/config.toml` under the `[channels]` section.
+
+```toml
+[channels.telegram]
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+default_agent = "assistant"
+allowed_users = ["123456789"]
+
+[channels.discord]
+bot_token_env = "DISCORD_BOT_TOKEN"
+default_agent = "coder"
+
+[channels.slack]
+bot_token_env = "SLACK_BOT_TOKEN"
+app_token_env = "SLACK_APP_TOKEN"
+default_agent = "ops"
+```
+
+### Common Configuration Fields
+
+<Accordion title="bot_token_env / token_env">
+  The environment variable holding the bot/access token. OpenFang reads the token from this env var at startup. All secrets are stored as `Zeroizing<String>` and wiped from memory on drop.
+</Accordion>
+
+<Accordion title="default_agent">
+  The agent name (or ID) that receives messages when no specific routing applies.
+</Accordion>
+
+<Accordion title="allowed_users">
+  Optional list of platform user IDs allowed to interact. Empty means allow all.
+</Accordion>
+
+<Accordion title="overrides">
+  Optional per-channel behavior overrides. See Channel Overrides section below.
+</Accordion>
+
+## Channel Overrides
+
+Every channel adapter supports `ChannelOverrides`, which let you customize behavior per channel without modifying the agent manifest.
+
+```toml
+[channels.telegram.overrides]
+model = "gemini-2.5-flash"
+system_prompt = "You are a concise Telegram assistant. Keep replies under 200 words."
+dm_policy = "respond"
+group_policy = "mention_only"
+rate_limit_per_user = 10
+threading = true
+output_format = "telegram_html"
+usage_footer = "compact"
+```
+
+### Override Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `model` | `Option<String>` | Agent default | Override the LLM model for this channel |
+| `system_prompt` | `Option<String>` | Agent default | Override the system prompt |
+| `dm_policy` | `DmPolicy` | `Respond` | How to handle direct messages |
+| `group_policy` | `GroupPolicy` | `MentionOnly` | How to handle group/channel messages |
+| `rate_limit_per_user` | `u32` | `0` (unlimited) | Max messages per minute per user |
+| `threading` | `bool` | `false` | Send replies as thread responses |
+| `output_format` | `Option<OutputFormat>` | `Markdown` | Output format for this channel |
+| `usage_footer` | `Option<UsageFooterMode>` | None | Append token usage to responses |
+
+## Output Formats and Policies
+
+### Output Formatter
+
+The formatter module converts Markdown output from the LLM into platform-native formats:
+
+| Format | Target | Notes |
+|--------|--------|-------|
+| `Markdown` | Standard Markdown | Default; passed through as-is |
+| `TelegramHtml` | Telegram HTML subset | Converts `**bold**` to `<b>`, `` `code` `` to `<code>` |
+| `SlackMrkdwn` | Slack mrkdwn | Converts `**bold**` to `*bold*`, links to `<url\|text>` |
+| `PlainText` | Plain text | Strips all formatting |
+
+### DM Policy
+
+Controls how the adapter handles direct messages:
+
+| Policy | Behavior |
+|--------|----------|
+| `Respond` | Respond to all DMs (default) |
+| `AllowedOnly` | Only respond to DMs from users in `allowed_users` |
+| `Ignore` | Silently drop all DMs |
+
+### Group Policy
+
+Controls how the adapter handles messages in group chats, channels, and rooms:
+
+| Policy | Behavior |
+|--------|----------|
+| `All` | Respond to every message in the group |
+| `MentionOnly` | Only respond when the bot is @mentioned (default) |
+| `CommandsOnly` | Only respond to `/command` messages |
+| `Ignore` | Silently ignore all group messages |
+
+<Note>
+Policy enforcement happens in `dispatch_message()` before the message reaches the agent loop. This means ignored messages consume zero LLM tokens.
+</Note>
+
+## Setup Guides
+
+### Telegram
+
+<Steps>
+  <Step title="Create a bot">
+    Open Telegram and message [@BotFather](https://t.me/botfather). Send `/newbot` and follow the prompts.
+  </Step>
+  
+  <Step title="Set environment variable">
+    ```bash
+    export TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.telegram]
+    bot_token_env = "TELEGRAM_BOT_TOKEN"
+    default_agent = "assistant"
+    
+    [channels.telegram.overrides]
+    output_format = "telegram_html"
+    group_policy = "mention_only"
+    ```
+  </Step>
+  
+  <Step title="Restart the daemon">
+    ```bash
+    openfang start
+    ```
+  </Step>
+</Steps>
+
+**How It Works:** Uses long-polling via the `getUpdates` API with 30-second timeout. Automatically splits responses over 4096 characters.
+
+**Interactive Setup:**
+```bash
+openfang channel setup telegram
+```
+
+### Discord
+
+<Steps>
+  <Step title="Create a Discord application">
+    Go to [Discord Developer Portal](https://discord.com/developers/applications) and create a new application.
+  </Step>
+  
+  <Step title="Add a bot">
+    Go to the **Bot** section, click "Add Bot", and enable **Message Content Intent** under Privileged Gateway Intents.
+  </Step>
+  
+  <Step title="Invite the bot">
+    Go to **OAuth2 > URL Generator**, select scope `bot` and permissions `Send Messages` + `Read Message History`. Use the generated URL to invite the bot.
+  </Step>
+  
+  <Step title="Set environment variable">
+    ```bash
+    export DISCORD_BOT_TOKEN=MTIzNDU2Nzg5.ABCDEF.ghijklmnop
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.discord]
+    bot_token_env = "DISCORD_BOT_TOKEN"
+    default_agent = "coder"
+    ```
+  </Step>
+</Steps>
+
+**How It Works:** Connects to Discord Gateway via WebSocket (v10). Handles reconnection, heartbeating, and session resumption automatically.
+
+### Slack
+
+<Steps>
+  <Step title="Create a Slack app">
+    Go to [Slack API](https://api.slack.com/apps), click "Create New App" > "From Scratch".
+  </Step>
+  
+  <Step title="Enable Socket Mode">
+    Go to Settings > Socket Mode, enable it, and generate an App-Level Token with scope `connections:write`.
+  </Step>
+  
+  <Step title="Add bot scopes">
+    Go to **OAuth & Permissions** and add: `chat:write`, `app_mentions:read`, `im:history`, `im:read`, `im:write`.
+  </Step>
+  
+  <Step title="Install to workspace">
+    Install the app to your workspace and copy the Bot User OAuth Token.
+  </Step>
+  
+  <Step title="Set environment variables">
+    ```bash
+    export SLACK_APP_TOKEN=xapp-1-...
+    export SLACK_BOT_TOKEN=xoxb-...
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.slack]
+    bot_token_env = "SLACK_BOT_TOKEN"
+    app_token_env = "SLACK_APP_TOKEN"
+    default_agent = "ops"
+    
+    [channels.slack.overrides]
+    output_format = "slack_mrkdwn"
+    threading = true
+    ```
+  </Step>
+</Steps>
+
+**How It Works:** Uses Socket Mode WebSocket connection. When `threading = true`, replies are sent to the message's thread via `thread_ts`.
+
+### WhatsApp
+
+<Steps>
+  <Step title="Set up Meta Business account">
+    Go to [Meta for Developers](https://developers.facebook.com/) and create a Business App.
+  </Step>
+  
+  <Step title="Add WhatsApp product">
+    Add the WhatsApp product and set up a test phone number.
+  </Step>
+  
+  <Step title="Get credentials">
+    Copy the Phone Number ID, Permanent Access Token, and choose a Verify Token.
+  </Step>
+  
+  <Step title="Set environment variables">
+    ```bash
+    export WA_PHONE_ID=123456789012345
+    export WA_ACCESS_TOKEN=EAABs...
+    export WA_VERIFY_TOKEN=my-secret-verify-token
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.whatsapp]
+    mode = "cloud_api"
+    phone_number_id_env = "WA_PHONE_ID"
+    access_token_env = "WA_ACCESS_TOKEN"
+    verify_token_env = "WA_VERIFY_TOKEN"
+    webhook_port = 8443
+    default_agent = "assistant"
+    ```
+  </Step>
+  
+  <Step title="Set up webhook">
+    In the Meta dashboard, configure webhook URL: `https://your-domain.com:8443/webhook/whatsapp` with your verify token.
+  </Step>
+</Steps>
+
+**How It Works:** Runs an HTTP server to receive webhooks from WhatsApp Cloud API. Handles verification (GET) and message reception (POST).
+
+### Matrix
+
+<Steps>
+  <Step title="Create bot account">
+    Create a bot account on your Matrix homeserver and generate an access token.
+  </Step>
+  
+  <Step title="Set environment variable">
+    ```bash
+    export MATRIX_TOKEN=syt_...
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.matrix]
+    homeserver_url = "https://matrix.org"
+    access_token_env = "MATRIX_TOKEN"
+    user_id = "@openfang-bot:matrix.org"
+    default_agent = "assistant"
+    ```
+  </Step>
+  
+  <Step title="Invite the bot">
+    Invite the bot to the rooms you want it to monitor.
+  </Step>
+</Steps>
+
+**How It Works:** Uses Matrix Client-Server API with long-polling `/sync`. Processes new messages from joined rooms.
+
+### Email
+
+<Steps>
+  <Step title="Create app password">
+    For Gmail, create an [App Password](https://myaccount.google.com/apppasswords).
+  </Step>
+  
+  <Step title="Set environment variable">
+    ```bash
+    export EMAIL_PASSWORD=abcd-efgh-ijkl-mnop
+    ```
+  </Step>
+  
+  <Step title="Configure in config.toml">
+    ```toml
+    [channels.email]
+    imap_host = "imap.gmail.com"
+    imap_port = 993
+    smtp_host = "smtp.gmail.com"
+    smtp_port = 587
+    username = "you@gmail.com"
+    password_env = "EMAIL_PASSWORD"
+    poll_interval = 30
+    default_agent = "email-assistant"
+    ```
+  </Step>
+</Steps>
+
+**How It Works:** Polls IMAP inbox at configured interval. Sends replies via SMTP, preserving subject line threading.
+
+## Agent Routing
+
+The `AgentRouter` determines which agent receives an incoming message:
+
+<Steps>
+  <Step title="Per-channel default">
+    Each channel config has a `default_agent` field. Messages from that channel go to that agent.
+  </Step>
+  
+  <Step title="User-agent binding">
+    If a user has been associated with a specific agent, messages from that user route to that agent.
+  </Step>
+  
+  <Step title="Command prefix">
+    Users can switch agents by sending `/agent coder` in chat. Subsequent messages route to the "coder" agent.
+  </Step>
+  
+  <Step title="Fallback">
+    If no routing applies, messages go to the first available agent.
+  </Step>
+</Steps>
+
+## WebChat (Built-in)
+
+The WebChat UI is embedded in the daemon and requires no configuration:
+
+```
+http://127.0.0.1:4200/
+```
+
+<CardGroup cols={2}>
+  <Card title="Real-time Chat" icon="comments">
+    WebSocket-based communication
+  </Card>
+  <Card title="Streaming Responses" icon="stream">
+    Text deltas arrive as generated
+  </Card>
+  <Card title="Agent Selection" icon="users">
+    Switch between running agents
+  </Card>
+  <Card title="Token Usage Display" icon="chart-simple">
+    Live token and cost tracking
+  </Card>
+</CardGroup>
+
+## Writing Custom Adapters
+
+To add support for a new messaging platform, implement the `ChannelAdapter` trait.
+
+### The ChannelAdapter Trait
+
+```rust
+pub trait ChannelAdapter: Send + Sync {
+    fn name(&self) -> &str;
+    fn channel_type(&self) -> ChannelType;
+    
+    async fn start(
+        &self,
+    ) -> Result<Pin<Box<dyn Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>>;
+    
+    async fn send(
+        &self,
+        user: &ChannelUser,
+        content: ChannelContent,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    
+    async fn send_typing(&self, _user: &ChannelUser) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
+    }
+    
+    async fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
+    
+    fn status(&self) -> ChannelStatus {
+        ChannelStatus::default()
+    }
+    
+    async fn send_in_thread(
+        &self,
+        user: &ChannelUser,
+        content: ChannelContent,
+        _thread_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.send(user, content).await
+    }
+}
+```
+
+### Implementation Steps
+
+<Steps>
+  <Step title="Define your adapter">
+    Create `crates/openfang-channels/src/myplatform.rs`:
+    
+    ```rust
+    use crate::types::{ChannelAdapter, ChannelType, ...};
+    use tokio::sync::watch;
+    use zeroize::Zeroizing;
+    
+    pub struct MyPlatformAdapter {
+        token: Zeroizing<String>,
+        client: reqwest::Client,
+        shutdown: watch::Receiver<bool>,
+    }
+    ```
+  </Step>
+  
+  <Step title="Implement the trait">
+    Use `ChannelType::Custom("myplatform".to_string())` for the channel type. Wrap secrets in `Zeroizing<String>`. Use exponential backoff for connection failures.
+  </Step>
+  
+  <Step title="Register the module">
+    In `crates/openfang-channels/src/lib.rs`:
+    ```rust
+    pub mod myplatform;
+    ```
+  </Step>
+  
+  <Step title="Wire into the bridge">
+    Add initialization logic in `crates/openfang-api/src/channel_bridge.rs`.
+  </Step>
+  
+  <Step title="Add config support">
+    Define config struct in `openfang-types` and add to `ChannelsConfig`.
+  </Step>
+  
+  <Step title="Add CLI setup wizard">
+    Add case to `cmd_channel_setup` in `crates/openfang-cli/src/main.rs`.
+  </Step>
+</Steps>
+
+<Note>
+**Key points for new adapters:**
+- Only the 9 most common channels have named `ChannelType` variants. All others use `Custom(String)`.
+- Wrap secrets in `Zeroizing<String>` so they are wiped from memory on drop.
+- Accept a `watch::Receiver<bool>` for coordinated shutdown with the daemon.
+- Use the shared `split_message(text, max_len)` utility for platforms with message length limits.
+</Note>

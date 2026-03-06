@@ -1,0 +1,372 @@
+---
+title: Desktop App
+description: Native desktop wrapper with system tray integration, OS notifications, and auto-updates
+icon: desktop
+---
+
+The OpenFang Desktop App is a native desktop wrapper built with [Tauri 2.0](https://v2.tauri.app/) that packages the entire OpenFang Agent OS into a single, installable application. Get a native window with system tray integration, OS notifications, and single-instance enforcement.
+
+<Note>
+**Crate:** `openfang-desktop`
+
+**Identifier:** `ai.openfang.desktop`
+
+**Product name:** OpenFang
+</Note>
+
+## Architecture
+
+The desktop app follows an embedded-server pattern:
+
+```
+┌───────────────────────────────────────────┐
+│  Tauri 2.0 Process                        │
+│                                           │
+│  ┌───────────┐    ┌────────────────────┐ │
+│  │  Main     │    │ Background Thread  │ │
+│  │  Thread   │    │ ("openfang-server")│ │
+│  │           │    │                    │ │
+│  │ WebView   │    │ tokio runtime      │ │
+│  │ Window    │───▶│ axum API server    │ │
+│  │ (main)    │    │ channel bridges    │ │
+│  │           │    │ background agents  │ │
+│  │ System    │    │                    │ │
+│  │ Tray      │    │ OpenFang Kernel    │ │
+│  └───────────┘    └────────────────────┘ │
+│       │                    │              │
+│       │   http://127.0.0.1:{port}        │
+│       └────────────────────┘              │
+└───────────────────────────────────────────┘
+```
+
+### Startup Sequence
+
+<Steps>
+  <Step title="Tracing Init">
+    `tracing_subscriber` is configured with `RUST_LOG` env, defaulting to `openfang=info,tauri=info`.
+  </Step>
+  
+  <Step title="Kernel Boot">
+    `OpenFangKernel::boot(None)` loads the default configuration from `config.toml`, wrapped in `Arc`. Calls `set_self_handle()` for self-referencing kernel operations.
+  </Step>
+  
+  <Step title="Port Binding">
+    A `TcpListener` binds to `127.0.0.1:0`, letting the OS assign a random free port. This ensures the port is known before creating the window.
+  </Step>
+  
+  <Step title="Server Thread">
+    Dedicated OS thread named `"openfang-server"` spawns with its own `tokio::runtime`. Runs:
+    - `kernel.start_background_agents()` - heartbeat monitor, autonomous agents
+    - `run_embedded_server()` - axum router via `build_router()`, serves with graceful shutdown
+  </Step>
+  
+  <Step title="Tauri App">
+    Tauri builder assembles with plugins, managed state, IPC commands, system tray, and WebView window pointing at `http://127.0.0.1:{port}`.
+  </Step>
+  
+  <Step title="Event Loop">
+    Tauri runs its native event loop. On exit, `server_handle.shutdown()` stops the embedded server and kernel.
+  </Step>
+</Steps>
+
+### Graceful Shutdown
+
+The axum server uses `with_graceful_shutdown()` wired to a watch channel:
+
+```rust
+let server = axum::serve(listener, app.into_make_service())
+    .with_graceful_shutdown(async move {
+        let _ = shutdown_rx.wait_for(|v| *v).await;
+    });
+```
+
+After shutdown, channel bridges (Telegram, Slack, etc.) are stopped via `bridge.stop().await`.
+
+## Features
+
+### System Tray
+
+The system tray provides quick access without bringing up the main window:
+
+| Menu Item | Behavior |
+|-----------|----------|
+| **Show Window** | Calls `show()`, `unminimize()`, and `set_focus()` on the main WebView window |
+| **Open in Browser** | Opens `http://127.0.0.1:{port}` in the default browser |
+| **Agents: N running** | Info only — shows current agent count (disabled) |
+| **Status: Running (uptime)** | Info only — shows uptime in human-readable format (disabled) |
+| **Launch at Login** | Checkbox — toggles OS-level auto-start via `tauri-plugin-autostart` |
+| **Check for Updates...** | Checks for updates, downloads, installs, and restarts if available |
+| **Open Config Directory** | Opens `~/.openfang/` in the OS file manager |
+| **Quit OpenFang** | Logs the quit event and calls `app.exit(0)` |
+
+<Note>
+**Left-click on tray icon** shows the main window (same as "Show Window" menu item).
+</Note>
+
+### Single-Instance Enforcement
+
+On desktop platforms, `tauri-plugin-single-instance` prevents multiple copies from running simultaneously. When a second instance attempts to launch, the existing instance's main window is shown, unminimized, and focused.
+
+### Hide-to-Tray on Close
+
+Closing the window does not quit the application. The window is hidden and the close event is suppressed:
+
+```rust
+.on_window_event(|window, event| {
+    #[cfg(desktop)]
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        let _ = window.hide();
+        api.prevent_close();
+    }
+})
+```
+
+<Warning>
+To actually quit, use the **"Quit OpenFang"** option in the system tray menu.
+</Warning>
+
+### Native OS Notifications
+
+The app subscribes to the kernel's event bus and forwards critical events as native desktop notifications:
+
+| Event | Notification Title | Body |
+|-------|-------------------|------|
+| `LifecycleEvent::Crashed` | Agent Crashed | Agent {id} crashed: {error} |
+| `LifecycleEvent::Spawned` | Agent Started | Agent "{name}" is now running |
+| `SystemEvent::HealthCheckFailed` | Health Check Failed | Agent {id} unresponsive for {secs}s |
+
+All other events are silently skipped.
+
+## IPC Commands
+
+Eleven Tauri IPC commands are registered, callable from the WebView frontend via `invoke()`:
+
+### Core Commands
+
+<CardGroup cols={2}>
+  <Card title="get_port" icon="network-wired">
+    Returns the port number (`u16`) the embedded server is listening on.
+    
+    ```typescript
+    const port: number = await invoke("get_port");
+    ```
+  </Card>
+  
+  <Card title="get_status" icon="circle-info">
+    Returns runtime status:
+    
+    ```json
+    {
+      "status": "running",
+      "port": 8042,
+      "agents": 5,
+      "uptime_secs": 3600
+    }
+    ```
+  </Card>
+  
+  <Card title="get_agent_count" icon="hashtag">
+    Returns the number of registered agents (`usize`).
+    
+    ```typescript
+    const count: number = await invoke("get_agent_count");
+    ```
+  </Card>
+  
+  <Card title="import_agent_toml" icon="file-import">
+    Opens native file picker for `.toml` files. Validates as `AgentManifest`, copies to `~/.openfang/agents/{name}/agent.toml`, and spawns the agent.
+  </Card>
+</CardGroup>
+
+### Skill & Config Commands
+
+<CardGroup cols={2}>
+  <Card title="import_skill_file" icon="wrench">
+    Opens file picker for skill files (`.md`, `.toml`, `.py`, `.js`, `.wasm`). Copies to `~/.openfang/skills/` and triggers hot-reload.
+  </Card>
+  
+  <Card title="open_config_dir" icon="folder-open">
+    Opens `~/.openfang/` in the OS file manager.
+  </Card>
+  
+  <Card title="open_logs_dir" icon="file-lines">
+    Opens `~/.openfang/logs/` in the OS file manager.
+  </Card>
+</CardGroup>
+
+### Auto-Start Commands
+
+<CardGroup cols={2}>
+  <Card title="get_autostart" icon="power-off">
+    Check if OpenFang launches at OS login.
+  </Card>
+  
+  <Card title="set_autostart" icon="toggle-on">
+    Toggle auto-start. Uses `tauri-plugin-autostart` (launchd on macOS, registry on Windows, systemd on Linux).
+  </Card>
+</CardGroup>
+
+### Update Commands
+
+<CardGroup cols={2}>
+  <Card title="check_for_updates" icon="magnifying-glass">
+    Checks for available updates without installing:
+    
+    ```json
+    {
+      "available": true,
+      "version": "0.2.0",
+      "body": "Release notes..."
+    }
+    ```
+  </Card>
+  
+  <Card title="install_update" icon="download">
+    Downloads and installs the latest update, then restarts the app. Does not return on success (app restarts).
+    
+    ```typescript
+    await invoke("install_update"); // App restarts
+    ```
+  </Card>
+</CardGroup>
+
+## Window Configuration
+
+The main window is created programmatically:
+
+| Property | Value |
+|----------|-------|
+| Window label | `"main"` |
+| Title | `"OpenFang"` |
+| URL | `http://127.0.0.1:{port}` (external) |
+| Inner size | 1280 x 800 |
+| Minimum inner size | 800 x 600 |
+| Position | Centered |
+
+The window uses `WebviewUrl::External(...)` because the WebView renders the axum-served UI.
+
+### Auto-Updater
+
+The app checks for updates 10 seconds after startup. If available, it downloads, installs, and restarts automatically.
+
+**Flow**:
+1. Startup check (10s delay) → `check_for_update()` → if available → notify user → `download_and_install_update()` → app restarts
+2. Tray "Check for Updates" → same flow, with failure notification if install fails
+
+<Note>
+**Configuration** (in `tauri.conf.json`):
+- `plugins.updater.pubkey` — Ed25519 public key (must match signing private key)
+- `plugins.updater.endpoints` — URL to `latest.json` (hosted on GitHub Releases)
+- `plugins.updater.windows.installMode` — `"passive"` (install without full UI)
+</Note>
+
+**Signing**: Every release bundle is signed with `TAURI_SIGNING_PRIVATE_KEY` (GitHub Secret). The `tauri-action` generates `latest.json` with download URLs and signatures.
+
+See the [Production Guide](/guides/production) for key generation and setup instructions.
+
+### Content Security Policy
+
+The `tauri.conf.json` configures a CSP that allows connections to the local embedded server:
+
+```
+default-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;
+img-src 'self' data: http://127.0.0.1:*;
+style-src 'self' 'unsafe-inline';
+script-src 'self' 'unsafe-inline'
+```
+
+This permits the WebView to load content from the localhost API server while blocking external resource loading.
+
+## Building
+
+### Prerequisites
+
+- **Rust** (stable toolchain)
+- **Tauri CLI v2**: `cargo install tauri-cli --version "^2"`
+- **Platform-specific dependencies**:
+  - **Windows**: WebView2 (included in Windows 10/11), Visual Studio Build Tools
+  - **macOS**: Xcode Command Line Tools
+  - **Linux**: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `libssl-dev`, `build-essential`
+
+### Development
+
+```bash
+cd crates/openfang-desktop
+cargo tauri dev
+```
+
+Launches the app with hot-reload support. Console window is visible in debug builds.
+
+### Production Build
+
+```bash
+cd crates/openfang-desktop
+cargo tauri build
+```
+
+Produces platform-specific installers:
+- **Windows**: `.msi` and `.exe` (NSIS) installers
+- **macOS**: `.dmg` and `.app` bundle
+- **Linux**: `.deb`, `.rpm`, and `.AppImage`
+
+<Note>
+The release binary suppresses the console window on Windows via:
+
+```rust
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+```
+</Note>
+
+## Plugins
+
+| Plugin | Version | Purpose |
+|--------|---------|---------||
+| `tauri-plugin-notification` | 2 | Native OS notifications for kernel events and update progress |
+| `tauri-plugin-shell` | 2 | Shell/process access from the WebView |
+| `tauri-plugin-dialog` | 2 | Native file picker for agent/skill import |
+| `tauri-plugin-single-instance` | 2 | Prevents multiple instances (desktop only) |
+| `tauri-plugin-autostart` | 2 | Launch at OS login (desktop only) |
+| `tauri-plugin-updater` | 2 | Signed auto-updates from GitHub Releases (desktop only) |
+| `tauri-plugin-global-shortcut` | 2 | Keyboard shortcuts (desktop only) |
+
+### Capabilities
+
+The default capability set grants:
+
+```json
+{
+  "identifier": "default",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "shell:default",
+    "dialog:default",
+    "global-shortcut:allow-register",
+    "autostart:default",
+    "updater:default"
+  ]
+}
+```
+
+Only the `"main"` window receives these permissions.
+
+## Mobile Ready
+
+The codebase includes conditional compilation for mobile platform support:
+
+- **Entry point**: The `run()` function is annotated with `#[cfg_attr(mobile, tauri::mobile_entry_point)]`
+- **Desktop-only features**: System tray, single-instance, and hide-to-tray are gated behind `#[cfg(desktop)]`
+- **Mobile targets**: iOS and Android builds are structurally supported by Tauri 2.0
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Production" icon="rocket" href="/guides/production">
+    Deploy OpenFang in production environments
+  </Card>
+  
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Full CLI command documentation
+  </Card>
+</CardGroup>

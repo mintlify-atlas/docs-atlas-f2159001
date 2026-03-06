@@ -1,0 +1,281 @@
+---
+title: 'Architecture'
+description: 'The 14-crate modular kernel design powering OpenFang'
+icon: 'cube'
+---
+
+## Overview
+
+OpenFang is built from the ground up in Rust as a true **Agent Operating System** — not a framework, not a library, but a complete OS for autonomous agents. The system compiles to a single ~32MB binary with 137,728 lines of code across 14 specialized crates.
+
+<Note>
+  The entire architecture is designed around **zero external dependencies at runtime**. No Python interpreter, no Node.js, no Docker required. One binary runs everything.
+</Note>
+
+## The 14-Crate Architecture
+
+OpenFang uses a modular kernel design where each crate has a single, well-defined responsibility. This creates clear boundaries and allows independent testing of each subsystem.
+
+### Core Crates
+
+<CardGroup cols={2}>
+  <Card title="openfang-kernel" icon="gear">
+    Orchestration hub managing agent lifecycles, permissions, scheduling, budget tracking, and RBAC. The kernel never calls LLMs directly — it delegates to the runtime.
+  </Card>
+  
+  <Card title="openfang-runtime" icon="bolt">
+    Agent execution environment with the main loop, 3 LLM drivers (Anthropic, Gemini, OpenAI-compatible), 53 built-in tools, WASM sandbox, MCP client, and A2A protocol.
+  </Card>
+  
+  <Card title="openfang-memory" icon="database">
+    Unified memory substrate over SQLite providing structured KV storage, semantic search, knowledge graphs, session persistence, and automatic memory consolidation.
+  </Card>
+  
+  <Card title="openfang-types" icon="shapes">
+    Core type definitions, trait bounds, and data structures shared across all crates. Contains taint tracking, Ed25519 manifest signing, and the model catalog.
+  </Card>
+</CardGroup>
+
+### Interface Crates
+
+<CardGroup cols={2}>
+  <Card title="openfang-api" icon="globe">
+    HTTP/WebSocket/SSE server with 140+ REST endpoints, OpenAI-compatible API, dashboard serving, rate limiting, and channel bridge.
+  </Card>
+  
+  <Card title="openfang-cli" icon="terminal">
+    Command-line interface with daemon management, TUI dashboard, interactive chat mode, and MCP server mode for tool exposure.
+  </Card>
+  
+  <Card title="openfang-desktop" icon="window-maximize">
+    Tauri 2.0 native desktop app with system tray integration, native notifications, global shortcuts, and offline-first architecture.
+  </Card>
+  
+  <Card title="openfang-channels" icon="message">
+    40 messaging platform adapters (Telegram, Discord, Slack, WhatsApp, etc.) with per-channel rate limiting, DM/group policies, and output formatting.
+  </Card>
+</CardGroup>
+
+### Agent Subsystems
+
+<CardGroup cols={2}>
+  <Card title="openfang-hands" icon="hand">
+    Autonomous capability packages with 7 bundled Hands, HAND.toml parser, lifecycle management, settings schema, and requirement validation.
+  </Card>
+  
+  <Card title="openfang-skills" icon="graduation-cap">
+    60 bundled domain expertise files (SKILL.md), parser, FangHub marketplace integration, and prompt injection scanning.
+  </Card>
+  
+  <Card title="openfang-extensions" icon="plug">
+    25 MCP server templates, AES-256-GCM credential vault with Argon2 key derivation, OAuth2 PKCE flow handler.
+  </Card>
+  
+  <Card title="openfang-wire" icon="network-wired">
+    OFP peer-to-peer protocol with HMAC-SHA256 mutual authentication, nonce-based replay protection, and distributed agent discovery.
+  </Card>
+</CardGroup>
+
+### Utility Crates
+
+<CardGroup cols={2}>
+  <Card title="openfang-migrate" icon="right-left">
+    Migration engine for importing from OpenClaw, LangChain, AutoGPT with agent manifest conversion, session history mapping, and config translation.
+  </Card>
+  
+  <Card title="xtask" icon="screwdriver-wrench">
+    Build automation, release packaging, cross-compilation targets, and development workflow scripts.
+  </Card>
+</CardGroup>
+
+## Crate Dependency Graph
+
+```
+openfang-types (base layer — no dependencies)
+       ↓
+   ┌───┴────────┬──────────┬──────────┐
+   ↓            ↓          ↓          ↓
+memory      runtime     wire     extensions
+   ↓            ↓          ↓          ↓
+   └────────────┴──────────┴──────────┘
+                ↓
+             kernel
+          ↓     ↓     ↓
+        api   cli  desktop
+         ↓
+     channels
+```
+
+<Steps>
+  <Step title="Types Layer">
+    `openfang-types` defines all core data structures with zero dependencies. Everything else builds on this foundation.
+  </Step>
+  
+  <Step title="Substrate Layer">
+    Memory, runtime, wire protocol, and extensions implement core subsystems using only the types layer.
+  </Step>
+  
+  <Step title="Kernel Layer">
+    The kernel orchestrates all subsystems without knowing about I/O boundaries (API, CLI, desktop).
+  </Step>
+  
+  <Step title="Interface Layer">
+    API, CLI, and desktop apps expose the kernel to users through different interfaces.
+  </Step>
+</Steps>
+
+## Key Architectural Patterns
+
+### KernelHandle Trait
+
+The runtime needs to call back into the kernel (e.g., to spawn child agents, check permissions) but cannot directly depend on `openfang-kernel` (circular dependency). Solution: **KernelHandle trait**.
+
+```rust
+// In openfang-runtime
+pub trait KernelHandle: Send + Sync {
+    fn spawn_agent(&self, manifest: AgentManifest) -> Result<AgentId>;
+    fn check_capability(&self, agent_id: AgentId, cap: Capability) -> bool;
+    fn get_budget_remaining(&self, agent_id: AgentId) -> Option<f64>;
+}
+
+// In openfang-kernel
+impl KernelHandle for OpenFangKernel {
+    fn spawn_agent(&self, manifest: AgentManifest) -> Result<AgentId> {
+        // actual implementation
+    }
+}
+```
+
+The runtime receives an `Arc<dyn KernelHandle>` and can make upward calls without compile-time coupling.
+
+### Memory Trait Abstraction
+
+All memory operations go through a single async trait, allowing the runtime to be storage-agnostic:
+
+```rust
+#[async_trait]
+pub trait Memory: Send + Sync {
+    async fn recall(&self, query: &str, limit: usize) -> Vec<MemoryFragment>;
+    async fn store(&self, agent_id: AgentId, content: &str, source: MemorySource);
+    async fn get(&self, agent_id: AgentId, key: &str) -> Option<Value>;
+    async fn set(&self, agent_id: AgentId, key: &str, value: Value);
+    // ... knowledge graph operations
+}
+```
+
+`MemorySubstrate` implements this by delegating to specialized stores (structured, semantic, knowledge, session) backed by a shared SQLite connection.
+
+### Channel Bridge Pattern
+
+The API server includes a **channel bridge** that routes messages from external platforms to agents without blocking HTTP threads:
+
+```
+Telegram Webhook → API Route → Channel Bridge → Kernel Event Bus → Agent Runtime
+                                     ↓
+                              Response Queue
+                                     ↓
+                            Telegram Bot API ← HTTP Client
+```
+
+This allows agents to respond through the same channel they were messaged on, creating a unified conversational experience.
+
+## Build & Deployment
+
+<Accordion title="Release Build Configuration">
+  ```toml
+  [profile.release]
+  lto = true              # Link-time optimization
+  codegen-units = 1       # Single codegen unit for max optimization
+  strip = true            # Strip debug symbols
+  opt-level = 3           # Maximum optimization
+  ```
+  
+  This produces a ~32MB binary on Linux x86_64 with all 14 crates linked.
+</Accordion>
+
+<Accordion title="Cross-Compilation Targets">
+  OpenFang supports:
+  - `x86_64-unknown-linux-gnu` (primary)
+  - `x86_64-apple-darwin` (macOS Intel)
+  - `aarch64-apple-darwin` (macOS Apple Silicon)
+  - `x86_64-pc-windows-msvc` (Windows)
+  - `aarch64-unknown-linux-gnu` (Linux ARM64)
+  
+  All builds use `rustls` instead of OpenSSL to avoid linking against system libraries.
+</Accordion>
+
+<Accordion title="Docker Deployment">
+  ```dockerfile
+  FROM rust:1.75 as builder
+  WORKDIR /build
+  COPY . .
+  RUN cargo build --release -p openfang-cli
+  
+  FROM debian:bookworm-slim
+  RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+  COPY --from=builder /build/target/release/openfang /usr/local/bin/
+  EXPOSE 4200
+  CMD ["openfang", "start"]
+  ```
+  
+  Final image is ~80MB (binary + minimal Debian base).
+</Accordion>
+
+## Testing Strategy
+
+OpenFang has **1,767+ tests** across all crates:
+
+- **Unit tests**: Every crate has inline `#[test]` functions for pure logic
+- **Integration tests**: `tests/` directories verify cross-crate interactions
+- **Live API tests**: `openfang-api/tests/api_integration_test.rs` boots a real daemon and hits endpoints
+- **Property tests**: Critical security code (taint tracking, audit chain) uses property-based testing
+
+```bash
+# Run all tests (currently 1,767+ passing)
+cargo test --workspace
+
+# Run only kernel tests
+cargo test -p openfang-kernel
+
+# Run integration tests with real LLM calls (requires API keys)
+GROQ_API_KEY=xxx cargo test --test api_integration_test -- --ignored
+```
+
+<Note>
+  The project enforces **zero Clippy warnings** in CI. Every commit must pass `cargo clippy --workspace --all-targets -- -D warnings`.
+</Note>
+
+## Performance Characteristics
+
+| Metric | Value | Comparison |
+|--------|-------|------------|
+| **Cold start** | 180ms | 28× faster than OpenClaw (5.98s) |
+| **Idle memory** | 40MB | 10× smaller than OpenClaw (394MB) |
+| **Binary size** | 32MB | 16× smaller than OpenClaw (500MB) |
+| **Test suite** | 1,767+ | Most comprehensive in category |
+
+These numbers come from:
+- Rust's zero-cost abstractions and ahead-of-time compilation
+- No JIT warmup, no garbage collection pauses
+- Static linking of all dependencies
+- Aggressive LTO and stripping in release builds
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Lifecycle" icon="circle-nodes" href="/concepts/agents">
+    Learn how agents are spawned, scheduled, and managed by the kernel
+  </Card>
+  
+  <Card title="Hands System" icon="hand" href="/concepts/hands">
+    Explore autonomous capability packages and how they work
+  </Card>
+  
+  <Card title="Memory Substrate" icon="database" href="/concepts/memory">
+    Deep dive into the three-layer memory system
+  </Card>
+  
+  <Card title="Security" icon="shield" href="/concepts/security">
+    Understand the 16 independent security layers
+  </Card>
+</CardGroup>

@@ -1,0 +1,576 @@
+---
+title: Workflow Engine
+description: Build multi-step agent pipelines with sequential, parallel, conditional, and loop execution
+icon: diagram-project
+---
+
+The OpenFang workflow engine enables multi-step agent pipelines where each step routes work to a specific agent, and output from one step flows as input to the next. Compose complex behaviors from simple, single-purpose agents without writing code.
+
+## When to Use Workflows
+
+Use workflows when you need to:
+
+<CardGroup cols={2}>
+  <Card icon="arrow-right">
+    **Sequential Processing**
+    
+    Chain agents in a pipeline (research → write → review)
+  </Card>
+  
+  <Card icon="sitemap">
+    **Parallel Execution**
+    
+    Fan work out to multiple agents and collect results
+  </Card>
+  
+  <Card icon="code-branch">
+    **Conditional Logic**
+    
+    Branch execution based on previous step outputs
+  </Card>
+  
+  <Card icon="rotate">
+    **Iterative Refinement**
+    
+    Loop until a quality gate is met
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+Create a workflow via the REST API:
+
+```bash
+curl -X POST http://localhost:4200/api/workflows \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "code-review-pipeline",
+    "description": "Analyze code, review for issues, and produce summary",
+    "steps": [
+      {
+        "name": "analyze",
+        "agent_name": "code-reviewer",
+        "prompt": "Analyze this code for bugs:\n\n{{input}}",
+        "mode": "sequential",
+        "output_var": "analysis"
+      },
+      {
+        "name": "security-check",
+        "agent_name": "security-auditor",
+        "prompt": "Review for security issues:\n\n{{analysis}}",
+        "mode": "sequential",
+        "output_var": "security_review"
+      },
+      {
+        "name": "summary",
+        "agent_name": "writer",
+        "prompt": "Write summary:\n\nAnalysis: {{analysis}}\n\nSecurity: {{security_review}}"
+      }
+    ]
+  }'
+```
+
+Execute the workflow:
+
+```bash
+curl -X POST http://localhost:4200/api/workflows/{id}/run \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Your code here..."}'
+```
+
+## Step Configuration
+
+Each step in a workflow has the following structure:
+
+```json
+{
+  "name": "step-name",
+  "agent_name": "researcher",        // OR "agent_id": "uuid"
+  "prompt": "Research: {{input}}",
+  "mode": "sequential",               // sequential | fan_out | collect | conditional | loop
+  "timeout_secs": 120,                // Default: 120
+  "error_mode": "fail",               // fail | skip | retry
+  "max_retries": 3,                   // Only for retry mode
+  "output_var": "research_output",   // Optional: store output for later reference
+  "condition": "ERROR",               // Only for conditional mode
+  "max_iterations": 5,                // Only for loop mode
+  "until": "APPROVED"                 // Only for loop mode
+}
+```
+
+### Agent Resolution
+
+Specify exactly one of:
+- `agent_name` - Reference agent by name (first match)
+- `agent_id` - Reference agent by UUID
+
+<Warning>
+If the agent cannot be resolved at execution time, the workflow fails.
+</Warning>
+
+## Execution Modes
+
+### Sequential (Default)
+
+The step runs after the previous step completes. Previous output becomes `{{input}}`.
+
+```json
+{ "mode": "sequential" }
+```
+
+<Steps>
+  <Step title="Step 1">
+    Receives initial workflow input
+  </Step>
+  <Step title="Step 2">
+    Receives Step 1's output as `{{input}}`
+  </Step>
+  <Step title="Step 3">
+    Receives Step 2's output as `{{input}}`
+  </Step>
+</Steps>
+
+### Fan-Out (Parallel)
+
+Multiple steps run **in parallel**. All receive the same `{{input}}` from the last sequential step.
+
+```json
+{ "mode": "fan_out" }
+```
+
+<Note>
+If any fan-out step fails or times out, the entire workflow fails immediately.
+</Note>
+
+**Example**: Three agents brainstorm in parallel:
+
+```json
+{
+  "steps": [
+    {
+      "name": "creative-ideas",
+      "agent_name": "writer",
+      "prompt": "Brainstorm 5 creative ideas for: {{input}}",
+      "mode": "fan_out"
+    },
+    {
+      "name": "technical-ideas",
+      "agent_name": "architect",
+      "prompt": "Brainstorm 5 technical ideas for: {{input}}",
+      "mode": "fan_out"
+    },
+    {
+      "name": "business-ideas",
+      "agent_name": "analyst",
+      "prompt": "Brainstorm 5 business ideas for: {{input}}",
+      "mode": "fan_out"
+    }
+  ]
+}
+```
+
+### Collect
+
+Gathers all outputs from preceding fan-out steps. This is a **data-only** step (no agent execution).
+
+```json
+{ "mode": "collect" }
+```
+
+Outputs are joined with `\n\n---\n\n` and set as `{{input}}` for subsequent steps.
+
+**Typical pattern**:
+```
+step 1: fan_out   →  runs in parallel
+step 2: fan_out   →  runs in parallel  
+step 3: collect   →  joins outputs
+step 4: sequential →  receives joined output
+```
+
+### Conditional
+
+The step only executes if previous output **contains** the condition substring (case-insensitive).
+
+```json
+{ "mode": "conditional", "condition": "ERROR" }
+```
+
+**Example**: Fact-check only if the article mentions claims:
+
+```json
+{
+  "name": "fact-check",
+  "agent_name": "analyst",
+  "prompt": "Fact-check this article:\n\n{{article}}",
+  "mode": "conditional",
+  "condition": "claim",
+  "error_mode": "skip"
+}
+```
+
+### Loop
+
+The step repeats up to `max_iterations` times. Terminates early if output **contains** the `until` substring.
+
+```json
+{ "mode": "loop", "max_iterations": 5, "until": "APPROVED" }
+```
+
+Each iteration feeds its output back as `{{input}}` for the next iteration.
+
+**Example**: Iterative refinement until approval:
+
+```json
+{
+  "name": "review-and-refine",
+  "agent_name": "code-reviewer",
+  "prompt": "Review this draft. If quality is good, respond with APPROVED. Otherwise, provide feedback and a revised version:\n\n{{input}}",
+  "mode": "loop",
+  "max_iterations": 4,
+  "until": "APPROVED"
+}
+```
+
+## Variable Substitution
+
+Prompt templates support two kinds of variables:
+
+### `{{input}}` - Previous Step Output
+
+Always available. Contains output from the immediately preceding step (or workflow's initial input for the first step).
+
+### `{{variable_name}}` - Named Variables
+
+When a step has `"output_var": "my_var"`, its output is stored and can be referenced in later steps:
+
+```json
+{
+  "steps": [
+    {
+      "name": "research",
+      "output_var": "research_output",
+      "prompt": "Research: {{input}}"
+    },
+    {
+      "name": "outline",
+      "output_var": "outline_output",
+      "prompt": "Outline based on: {{input}}"
+    },
+    {
+      "name": "combine",
+      "prompt": "Write article.\nResearch: {{research_output}}\nOutline: {{outline_output}}"
+    }
+  ]
+}
+```
+
+<Note>
+Variables persist for the entire workflow run. Later steps can overwrite variables by using the same `output_var` name.
+</Note>
+
+## Error Handling
+
+### Fail (Default)
+
+```json
+{ "error_mode": "fail" }
+```
+
+The workflow aborts immediately on error or timeout. The run state is set to `Failed`.
+
+### Skip
+
+```json
+{ "error_mode": "skip" }
+```
+
+The step is silently skipped on error. A warning is logged, but the workflow continues. The `{{input}}` for the next step remains unchanged.
+
+### Retry
+
+```json
+{ "error_mode": "retry", "max_retries": 3 }
+```
+
+The step is retried up to `max_retries` times after the initial attempt (4 total attempts). Each attempt gets the full timeout budget.
+
+<Warning>
+If all attempts fail, the workflow aborts with an error.
+</Warning>
+
+## Complete Examples
+
+### Example 1: Code Review Pipeline
+
+Sequential pipeline where code is analyzed, reviewed for security, and summarized.
+
+```json
+{
+  "name": "code-review-pipeline",
+  "description": "Analyze code, review for issues, and produce summary",
+  "steps": [
+    {
+      "name": "analyze",
+      "agent_name": "code-reviewer",
+      "prompt": "Analyze the following code for bugs, style issues, and security vulnerabilities:\n\n{{input}}",
+      "mode": "sequential",
+      "timeout_secs": 180,
+      "error_mode": "fail",
+      "output_var": "analysis"
+    },
+    {
+      "name": "security-check",
+      "agent_name": "security-auditor",
+      "prompt": "Review this code analysis for security issues:\n\n{{analysis}}",
+      "mode": "sequential",
+      "timeout_secs": 120,
+      "error_mode": "retry",
+      "max_retries": 2,
+      "output_var": "security_review"
+    },
+    {
+      "name": "summary",
+      "agent_name": "writer",
+      "prompt": "Write a concise code review summary.\n\nCode Analysis:\n{{analysis}}\n\nSecurity Review:\n{{security_review}}",
+      "mode": "sequential",
+      "timeout_secs": 60
+    }
+  ]
+}
+```
+
+### Example 2: Multi-Agent Brainstorm
+
+Three agents brainstorm in parallel, then a fourth synthesizes their ideas.
+
+```json
+{
+  "name": "brainstorm",
+  "description": "Parallel brainstorm with 3 agents, then synthesize",
+  "steps": [
+    {
+      "name": "creative-ideas",
+      "agent_name": "writer",
+      "prompt": "Brainstorm 5 creative ideas for: {{input}}",
+      "mode": "fan_out",
+      "timeout_secs": 60
+    },
+    {
+      "name": "technical-ideas",
+      "agent_name": "architect",
+      "prompt": "Brainstorm 5 technically feasible ideas for: {{input}}",
+      "mode": "fan_out",
+      "timeout_secs": 60
+    },
+    {
+      "name": "business-ideas",
+      "agent_name": "analyst",
+      "prompt": "Brainstorm 5 ideas with strong business potential for: {{input}}",
+      "mode": "fan_out",
+      "timeout_secs": 60
+    },
+    {
+      "name": "gather",
+      "mode": "collect"
+    },
+    {
+      "name": "synthesize",
+      "agent_name": "orchestrator",
+      "prompt": "You received brainstorm results from three perspectives. Synthesize them into the top 5 actionable ideas, ranked by impact:\n\n{{input}}",
+      "mode": "sequential",
+      "timeout_secs": 120
+    }
+  ]
+}
+```
+
+### Example 3: Iterative Refinement
+
+Agent refines a draft until it meets quality standards.
+
+```json
+{
+  "name": "iterative-refinement",
+  "description": "Refine document until approved or max iterations",
+  "steps": [
+    {
+      "name": "first-draft",
+      "agent_name": "writer",
+      "prompt": "Write a first draft about: {{input}}",
+      "mode": "sequential",
+      "timeout_secs": 120,
+      "output_var": "draft"
+    },
+    {
+      "name": "review-and-refine",
+      "agent_name": "code-reviewer",
+      "prompt": "Review this draft. If it meets quality standards, respond with APPROVED at the start. Otherwise, provide specific feedback and a revised version:\n\n{{input}}",
+      "mode": "loop",
+      "max_iterations": 4,
+      "until": "APPROVED",
+      "timeout_secs": 180,
+      "error_mode": "retry",
+      "max_retries": 1
+    }
+  ]
+}
+```
+
+## Event Triggers
+
+The trigger engine provides event-driven automation. Triggers watch the kernel's event bus and automatically send messages to agents when matching events arrive.
+
+### Creating a Trigger
+
+```bash
+curl -X POST http://localhost:4200/api/triggers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "<agent-uuid>",
+    "pattern": "lifecycle",
+    "prompt_template": "A lifecycle event occurred: {{event}}",
+    "max_fires": 0
+  }'
+```
+
+### Trigger Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| `"all"` | Matches every event (wildcard) |
+| `"lifecycle"` | Matches any lifecycle event (spawned, started, terminated) |
+| `{"agent_spawned": {"name_pattern": "coder"}}` | Matches when an agent with name containing pattern is spawned |
+| `"agent_terminated"` | Matches when any agent terminates or crashes |
+| `"system"` | Matches any system event (health checks, quota warnings) |
+| `{"system_keyword": {"keyword": "quota"}}` | Matches system events containing keyword |
+| `"memory_update"` | Matches any memory change event |
+| `{"memory_key_pattern": {"key_pattern": "config"}}` | Matches memory updates where key contains pattern |
+| `{"content_match": {"substring": "error"}}` | Matches events whose description contains substring |
+
+### Prompt Templates
+
+When a trigger fires, `{{event}}` is replaced with a human-readable event description:
+
+- `"Agent 'coder' (id: <uuid>) was spawned"`
+- `"Agent <uuid> terminated: shutdown requested"`
+- `"Quota warning: agent <uuid>, tokens at 85.0%"`
+- `"Health check failed: agent <uuid>, unresponsive for 30s"`
+
+### Use Cases
+
+<CardGroup cols={2}>
+  <Card icon="heartbeat" title="Health Monitoring">
+    ```json
+    {
+      "pattern": {"content_match": {"substring": "health check failed"}},
+      "prompt_template": "ALERT: {{event}}. Investigate status of all agents."
+    }
+    ```
+  </Card>
+  
+  <Card icon="bell" title="Spawn Notifications">
+    ```json
+    {
+      "pattern": {"agent_spawned": {"name_pattern": "*"}},
+      "prompt_template": "New agent created: {{event}}. Update fleet roster."
+    }
+    ```
+  </Card>
+  
+  <Card icon="gauge-high" title="Quota Alerts">
+    ```json
+    {
+      "pattern": {"system_keyword": {"keyword": "quota"}},
+      "prompt_template": "Quota event: {{event}}. Recommend action.",
+      "max_fires": 1
+    }
+    ```
+  </Card>
+  
+  <Card icon="memory" title="Memory Changes">
+    ```json
+    {
+      "pattern": {"memory_key_pattern": {"key_pattern": "config"}},
+      "prompt_template": "Config changed: {{event}}. Validate settings."
+    }
+    ```
+  </Card>
+</CardGroup>
+
+## API Endpoints
+
+### Workflows
+
+```bash
+# Create workflow
+POST /api/workflows
+
+# List workflows
+GET /api/workflows
+
+# Execute workflow
+POST /api/workflows/:id/run
+
+# List workflow runs
+GET /api/workflows/:id/runs
+```
+
+### Triggers
+
+```bash
+# Create trigger
+POST /api/triggers
+
+# List triggers (optionally filter by agent)
+GET /api/triggers?agent_id=<uuid>
+
+# Enable/disable trigger
+PUT /api/triggers/:id
+
+# Delete trigger
+DELETE /api/triggers/:id
+```
+
+## CLI Commands
+
+```bash
+# List all workflows
+openfang workflow list
+
+# Create workflow from JSON file
+openfang workflow create workflow.json
+
+# Execute workflow
+openfang workflow run <workflow-id> "input text"
+
+# List all triggers
+openfang trigger list
+
+# Create trigger
+openfang trigger create <agent-id> '"lifecycle"' --prompt "Event: {{event}}"
+
+# Delete trigger
+openfang trigger delete <trigger-id>
+```
+
+## Limits and Quotas
+
+<Note>
+**Run Eviction**: The workflow engine retains a maximum of **200** workflow runs. Oldest completed/failed runs are evicted when this limit is exceeded.
+</Note>
+
+- **Step Timeout**: Default 120 seconds per step (configurable)
+- **Loop Iteration Cap**: Default 5 iterations (configurable)
+- **Hourly Token Quota**: Enforced per-agent via `max_llm_tokens_per_hour`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Agents" icon="robot" href="/guides/creating-agents">
+    Build custom agents for your workflows
+  </Card>
+  
+  <Card title="Event System" icon="bolt" href="/api/workflows">
+    Learn about the event bus architecture
+  </Card>
+</CardGroup>

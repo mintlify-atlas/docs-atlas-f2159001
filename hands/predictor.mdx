@@ -1,0 +1,426 @@
+---
+title: 'Predictor Hand'
+description: 'Autonomous forecasting engine that makes calibrated predictions and tracks accuracy over time'
+icon: 'crystal-ball'
+---
+
+## Overview
+
+Predictor Hand is an AI forecasting engine inspired by superforecasting principles. It collects signals, builds reasoning chains, makes calibrated predictions, and rigorously tracks accuracy over time.
+
+**Category:** Data  
+**Icon:** 🔮
+
+## What It Does
+
+<Steps>
+  <Step title="Collect Signals">
+    Gather data from news, social media, financial markets, and academic sources
+  </Step>
+  
+  <Step title="Build Reasoning Chains">
+    Apply base rates, weigh evidence for/against, identify key assumptions
+  </Step>
+  
+  <Step title="Make Predictions">
+    Generate specific, falsifiable predictions with calibrated confidence levels
+  </Step>
+  
+  <Step title="Track Accuracy">
+    Score predictions when they expire, calculate Brier scores, analyze calibration
+  </Step>
+  
+  <Step title="Generate Reports">
+    Deliver prediction reports with accuracy dashboards and meta-analysis
+  </Step>
+</Steps>
+
+## Configuration
+
+### Prediction Domain
+
+| Domain | Focus Areas | Example Predictions |
+|--------|-------------|---------------------|
+| **Technology** | Product launches, adoption, regulations | "GPT-5 will launch before Q3 2026" |
+| **Finance & Markets** | Earnings, macroeconomics, M&A | "S&P 500 above 6000 by year-end" |
+| **Geopolitics** | Elections, treaties, conflicts | "UK rejoins EU single market by 2028" |
+| **Climate & Energy** | Emissions, renewable adoption, policy | "Solar reaches 30% of US grid by 2027" |
+| **General** | Cross-domain trends | "Remote work exceeds in-office by 2025" |
+
+### Forecasting Settings
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| **Time Horizon** | `1_week`, `1_month`, `3_months`, `1_year` | How far ahead to predict |
+| **Data Sources** | `news`, `social`, `financial`, `academic`, `all` | What to monitor |
+| **Report Frequency** | `daily`, `weekly`, `biweekly`, `monthly` | How often to generate predictions |
+| **Predictions Per Report** | 3, 5, 10, 20 | Number per report |
+
+### Quality Controls
+
+| Setting | Description |
+|---------|-------------|
+| **Track Accuracy** | Score past predictions when time horizon expires |
+| **Confidence Threshold** | Minimum confidence to include (`low` 20%+, `medium` 40%+, `high` 70%+) |
+| **Contrarian Mode** | Actively seek counter-consensus predictions |
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate predictor
+```
+
+Configure your forecasting domain:
+
+```bash
+openfang hand config predictor \
+  --set prediction_domain="tech" \
+  --set time_horizon="3_months" \
+  --set data_sources="all" \
+  --set report_frequency="weekly" \
+  --set predictions_per_report="5" \
+  --set track_accuracy="true" \
+  --set confidence_threshold="medium"
+```
+
+### Example Workflow
+
+```
+Domain: Technology
+Horizon: 3 months
+Frequency: Weekly reports with 5 predictions
+
+> Make predictions about AI model releases in Q2 2026
+```
+
+Predictor Hand will:
+1. Collect signals from tech news, social media, company announcements
+2. Analyze base rates (how often do model releases match predictions?)
+3. Build reasoning chains for/against each prediction
+4. Generate 5 calibrated predictions with resolution criteria
+5. Store predictions in ledger with `resolution_date = 2026-06-30`
+6. When June 30 arrives, research actual outcomes and score accuracy
+7. Update Brier score and calibration metrics
+
+## How It Works
+
+### 1. Signal Collection
+
+Executes 20-40 targeted search queries based on domain:
+
+**Technology signals:**
+```
+"AI model release 2026"
+"GPT-5 launch date"
+"Claude 4 announcement"
+"AI regulation breaking news"
+"LLM adoption metrics"
+```
+
+**Financial signals:**
+```
+"S&P 500 forecast 2026"
+"Fed interest rate decision"
+"tech earnings Q1 2026"
+"recession indicator"
+"analyst consensus"
+```
+
+For each result:
+- `web_search` → top results
+- `web_fetch` → extract claims, data points, expert opinions
+- Tag signals:
+  - **Type:** leading/lagging indicator, base rate, expert opinion, data point, anomaly
+  - **Strength:** strong/moderate/weak
+  - **Direction:** bullish/bearish/neutral
+  - **Source credibility:** institutional/media/individual/anonymous
+
+### 2. Accuracy Review
+
+For predictions where `resolution_date <= today`:
+
+<Steps>
+  <Step title="Research Outcome">
+    Search for evidence of what actually happened
+  </Step>
+  
+  <Step title="Score Prediction">
+    **Correct**, **Partially correct**, **Incorrect**, or **Unresolvable**
+  </Step>
+  
+  <Step title="Calculate Brier Score">
+    `(predicted_probability - actual_outcome)^2` where outcome is 0 or 1
+  </Step>
+  
+  <Step title="Update Calibration">
+    Check if your 70% predictions are right ~70% of the time
+  </Step>
+</Steps>
+
+**Example:**
+```
+Prediction: "GPT-5 will launch before July 1, 2026"
+Confidence: 65%
+Resolution Date: 2026-07-01
+
+Actual: GPT-5 launched June 15, 2026
+Result: Correct
+Brier Score: (0.65 - 1.0)^2 = 0.1225 (good)
+```
+
+### 3. Reasoning Chain Construction
+
+For each potential prediction:
+
+```markdown
+PREDICTION: GPT-5 will launch before July 1, 2026
+CONFIDENCE: 65%
+TIME HORIZON: 3 months
+
+REASONING CHAIN:
+
+1. Base rate: OpenAI major releases (GPT-3 → GPT-4 was 16 months)
+   - GPT-4 launched March 2023
+   - 16-month cycle suggests GPT-5 around July 2024
+   - But GPT-4.5 / intermediate releases can delay major versions
+
+2. Evidence FOR (+25%):
+   - Sam Altman hinted at "big releases" in Q2 2026 interview
+   - OpenAI job postings for "GPT-5 safety team" (leaked, Feb 2026)
+   - Compute cluster expansion reported by The Information
+   - Typical OpenAI release pattern: announce 2-4 weeks before launch
+
+3. Evidence AGAINST (-10%):
+   - No official announcement yet (as of March 6)
+   - Safety testing typically takes 6+ months
+   - GPT-4.5 Turbo still rolling out features
+   - Regulatory scrutiny may delay
+
+4. Net adjustment from base rate:
+   - Base: 50% (coin flip without other info)
+   - Signals: +25% -10% = +15%
+   - Final: 65% confidence
+
+KEY ASSUMPTIONS:
+- "GPT-5" refers to a model OpenAI officially calls "GPT-5" (not GPT-4.5, not internal codename)
+- "Launch" means public API access (not just announcement or limited preview)
+
+RESOLUTION CRITERIA:
+- Check openai.com/blog and OpenAI API docs on July 1, 2026
+- If GPT-5 API endpoint is live and publicly accessible → Correct
+- If only announced but not launched → Incorrect
+- If launched after July 1 → Incorrect
+```
+
+### 4. Cognitive Bias Checks
+
+Before finalizing predictions:
+
+- **Anchoring** — Am I fixating on a salient number?
+- **Narrative bias** — Good story ≠ likely outcome
+- **Overconfidence** — Are my 90% predictions actually 60%?
+- **Base rate neglect** — Did I start with historical frequency?
+
+### 5. Contrarian Mode (Optional)
+
+If `contrarian_mode = true`:
+
+1. Identify consensus view from collected signals
+2. Search for evidence contradicting consensus
+3. Include at least one counter-consensus prediction per report
+
+**Example:**
+```
+Consensus: "AI will continue exponential scaling"
+Contrarian: "AI scaling will hit diminishing returns by Q4 2026"
+Confidence: 35% (minority view, but signals suggest possible)
+Reasoning: Chinchilla scaling laws, compute cost curves, plateau in benchmarks
+```
+
+### 6. Report Generation
+
+```markdown
+# Prediction Report: Technology
+**Date**: 2026-03-06 | **Report #**: 8 | **Signals Analyzed**: 42
+
+## Accuracy Dashboard
+- Overall accuracy: 68% (25 predictions resolved)
+- Brier score: 0.18 (lower is better, 0 = perfect)
+- Calibration: Well-calibrated (70% predictions correct 72% of time)
+
+## Active Predictions
+
+| # | Prediction | Confidence | Horizon | Status |
+|---|-----------|------------|---------|--------|
+| P-042 | GPT-5 launches before July 1 | 65% | Jun 30 | Active |
+| P-043 | Apple Vision Pro 2 announced WWDC | 80% | Jun 10 | Active |
+| P-041 | Llama 4 released | 45% | May 31 | Active |
+
+## New Predictions This Report
+
+### P-042: GPT-5 launches before July 1, 2026
+**Confidence:** 65%  
+**Resolution Date:** 2026-07-01
+
+**Reasoning Chain:**
+[Full reasoning from above]
+
+---
+
+### P-043: Apple announces Vision Pro 2 at WWDC 2026
+**Confidence:** 80%  
+**Resolution Date:** 2026-06-10
+
+**Reasoning:**
+- Base rate: Apple announces hardware at WWDC 40% of time (historically)
+- Vision Pro 1 launched Feb 2024, 16-month cycle suggests June 2025
+- But Gen 1 adoption slow (reports of <500k units sold)
+- Gen 2 would need compelling new features to justify WWDC stage time
+- Supply chain leaks show new display tech in production (Kuo, Feb 2026)
+- WWDC 2026 theme "Spatial Computing" suggests Vision focus
+- Net: 80% confidence (strong signals, fits pattern)
+
+**Resolution:** Check Apple WWDC 2026 keynote for "Vision Pro 2" announcement.
+
+---
+
+## Expired Predictions (Resolved This Cycle)
+
+### P-038: US Congress passes AI regulation by March 1
+**Prediction:** 40% confidence  
+**Actual:** No bill passed  
+**Result:** ✓ Correct (predicted low probability, and it didn't happen)  
+**Brier Score:** (0.40 - 0)^2 = 0.16
+
+### P-039: Anthropic raises Series D before Feb 28
+**Prediction:** 70% confidence  
+**Actual:** Announced Feb 20, $850M  
+**Result:** ✓ Correct  
+**Brier Score:** (0.70 - 1.0)^2 = 0.09 (excellent)
+
+## Signal Landscape
+
+Key signals this cycle:
+- **AI safety regulation:** EU AI Act enforcement begins, US bill stalled
+- **Model releases:** Gemini 2.0 Pro launched, Claude 3.5 updated
+- **Hardware:** NVIDIA B100 GPUs shipping to hyperscalers
+- **Adoption:** Enterprise AI spend up 40% YoY (Gartner)
+
+## Meta-Analysis
+
+Your forecasting strengths:
+- **Product launches:** 78% accuracy (strong pattern recognition)
+- **Regulatory predictions:** 55% accuracy (high uncertainty, hard to predict)
+- **Calibration:** Well-calibrated overall, slight overconfidence on <6 month horizons
+
+Recommendations:
+- Lower confidence on short-term regulatory predictions (too many variables)
+- Continue current approach for tech product launches
+- Consider adding insider network signals for private company predictions
+```
+
+## Output
+
+| File | Description |
+|------|-------------|
+| `prediction_report_YYYY-MM-DD.md` | Weekly/monthly prediction report |
+| `predictions_database.json` | Ledger of all predictions and outcomes |
+
+## Dashboard Metrics
+
+- **Predictions Made** — Total predictions ever made
+- **Accuracy** — Percentage of resolved predictions that were correct
+- **Reports Generated** — Number of reports delivered
+- **Active Predictions** — Currently unresolved predictions
+
+## Prediction Quality
+
+### What Makes a Good Prediction
+
+<Note>
+Good predictions are:
+
+- **Specific** — "GPT-5 will launch before July 1" not "AI will advance"
+- **Falsifiable** — Clear resolution criteria
+- **Calibrated** — Honest confidence levels (not always 90%)
+- **Timestamped** — Exact resolution date
+- **Reasoned** — Explicit chain of logic
+</Note>
+
+### Brier Score Explained
+
+Brier score measures prediction accuracy:
+
+```
+Brier = (predicted_probability - actual_outcome)^2
+```
+
+- **0.00** — Perfect (predicted 100% and it happened, or 0% and it didn't)
+- **0.25** — Random guessing (50% confidence on everything)
+- **1.00** — Worst possible (predicted 100% and it didn't happen)
+
+**Goal:** Keep Brier score below 0.20 for good forecasting.
+
+## Tips & Best Practices
+
+<Warning>
+**Never express confidence as 0% or 100%** — Nothing is certain. Use ranges like 5-95%.
+</Warning>
+
+<Note>
+**For best forecasting:**
+
+- Always start with base rates (historical frequency)
+- Show your work — reasoning chains catch errors
+- Track ALL predictions — don't selectively forget bad ones
+- Update predictions when new evidence arrives (note updates in ledger)
+- Distinguish predictions (testable) from opinions (untestable)
+</Note>
+
+### Common Pitfalls
+
+**Overconfidence**  
+Most people are overconfident. If you're above 90% on most predictions, you're probably overconfident.
+
+**Narrative bias**  
+A compelling story doesn't make an outcome likely. Check the base rates.
+
+**Confirmation bias**  
+Actively search for evidence AGAINST your prediction, not just for it.
+
+**Anchoring**  
+Don't fixate on the first number you see. Consider the full range.
+
+## Advanced Usage
+
+### Custom Prediction Requests
+
+```
+Predict: Will Rust overtake C++ in the TIOBE index by 2027?
+```
+
+### Multi-Step Conditional Predictions
+
+```
+If GPT-5 launches in Q2 2026, predict the probability of GPT-6 by Q2 2027
+```
+
+### Accuracy Analysis
+
+```
+Analyze my prediction accuracy on AI regulation vs product launches
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Collector Hand" icon="magnifying-glass" href="/hands/collector">
+    Collect signals for better predictions
+  </Card>
+  
+  <Card title="Researcher Hand" icon="flask" href="/hands/researcher">
+    Deep research on prediction topics
+  </Card>
+</CardGroup>

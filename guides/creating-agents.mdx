@@ -1,0 +1,388 @@
+---
+title: Creating Agents
+description: Learn how to create custom agents using templates, manifests, and best practices
+icon: robot
+---
+
+OpenFang ships with 30 pre-built agent templates across 4 performance tiers. This guide covers spawning agents from templates, creating custom agent manifests, and understanding the agent architecture.
+
+## Quick Start
+
+Spawn any template from the CLI:
+
+```bash
+openfang spawn orchestrator
+openfang spawn coder
+openfang spawn --template agents/writer/agent.toml
+```
+
+Spawn via the REST API:
+
+```bash
+# Spawn from a built-in template name
+curl -X POST http://localhost:4200/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{"template": "coder"}'
+
+# Spawn with overrides
+curl -X POST http://localhost:4200/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{"template": "writer", "model": "gemini-2.5-flash"}'
+```
+
+## Agent Template Tiers
+
+Templates are organized into 4 tiers based on task complexity and model capabilities:
+
+<CardGroup cols={2}>
+  <Card title="Tier 1: Frontier" icon="chess-knight">
+    DeepSeek for deep reasoning: orchestration, architecture, security
+    
+    **Models**: `deepseek-chat`
+    
+    **Agents**: orchestrator, architect, security-auditor
+  </Card>
+  
+  <Card title="Tier 2: Smart" icon="brain">
+    Gemini 2.5 Flash for coding, research, analysis, testing
+    
+    **Models**: `gemini-2.5-flash`
+    
+    **Agents**: coder, researcher, data-scientist, test-engineer
+  </Card>
+  
+  <Card title="Tier 3: Balanced" icon="scale-balanced">
+    Groq + Gemini fallback for business and productivity
+    
+    **Models**: `llama-3.3-70b-versatile` → `gemini-2.0-flash`
+    
+    **Agents**: planner, writer, assistant, customer-support
+  </Card>
+  
+  <Card title="Tier 4: Fast" icon="bolt">
+    Groq for lightweight, high-speed tasks
+    
+    **Models**: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`
+    
+    **Agents**: ops, translator, tutor, health-tracker
+  </Card>
+</CardGroup>
+
+## Featured Agent Templates
+
+### Orchestrator
+
+<Note>
+**Tier 1** | `deepseek/deepseek-chat` | Fallback: `groq/llama-3.3-70b-versatile`
+</Note>
+
+Meta-agent that decomposes complex tasks, delegates to specialist agents, and synthesizes results.
+
+```bash
+openfang spawn orchestrator
+# "Plan and execute a full security audit of the codebase"
+```
+
+**Capabilities**:
+- Analyzes requests and breaks them into subtasks
+- Discovers specialists using `agent_list`
+- Delegates via `agent_send` and spawns agents as needed
+- Synthesizes all responses into coherent answers
+- Explains delegation strategy before executing
+
+**Tools**: `agent_send`, `agent_spawn`, `agent_list`, `agent_kill`, `memory_store`, `memory_recall`, `file_read`, `file_write`
+
+### Coder
+
+<Note>
+**Tier 2** | `gemini/gemini-2.5-flash` | Fallback: `groq/llama-3.3-70b-versatile`
+</Note>
+
+Expert software engineer that reads, writes, and analyzes code.
+
+```bash
+openfang spawn coder
+# "Implement a rate limiter using the token bucket algorithm in Rust"
+```
+
+**Approach**:
+- Reads files first to understand context
+- Makes precise, minimal changes
+- Always writes tests for produced code
+- Supports Rust, Python, JavaScript, and more
+
+**Tools**: `file_read`, `file_write`, `file_list`, `shell_exec`
+
+**Shell access**: `cargo *`, `rustc *`, `git *`, `npm *`, `python *`
+
+### Security Auditor
+
+<Note>
+**Tier 1** | `deepseek/deepseek-chat` | Fallback: `groq/llama-3.3-70b-versatile`
+</Note>
+
+Security specialist that reviews code for vulnerabilities and performs threat modeling.
+
+```bash
+openfang spawn security-auditor
+# "Audit the authentication module for vulnerabilities"
+```
+
+**Focus areas**:
+- OWASP Top 10
+- Input validation and auth flaws
+- Cryptographic misuse
+- Injection attacks (SQL, XSS, command)
+- Secrets management
+- Race conditions and privilege escalation
+
+**Report format**: Finding → Impact → Evidence → Remediation
+
+### Assistant
+
+<Note>
+**Tier 3** | `groq/llama-3.3-70b-versatile` | Fallback: `gemini/gemini-2.0-flash`
+</Note>
+
+The versatile default agent for everyday tasks, questions, and conversations.
+
+```bash
+openfang spawn assistant
+# "Help me plan my week and draft replies to these three emails"
+```
+
+**Capabilities**:
+- Conversational intelligence and task execution
+- Research and synthesis
+- Writing and communication
+- Problem solving
+- Agent delegation (routes to specialists)
+- Knowledge management
+
+## Creating Custom Agents
+
+### Agent Manifest Format
+
+Create a custom agent by writing an `agent.toml` manifest:
+
+```toml agent.toml
+# Required fields
+name = "my-agent"
+version = "0.1.0"
+description = "What this agent does in one sentence."
+author = "your-name"
+module = "builtin:chat"
+
+# Optional metadata
+tags = ["tag1", "tag2"]
+
+# Model configuration (required)
+[model]
+provider = "gemini"                  # Provider: gemini, deepseek, groq, openai, anthropic, etc.
+model = "gemini-2.5-flash"           # Model identifier
+api_key_env = "GEMINI_API_KEY"       # Env var holding the API key
+max_tokens = 4096                    # Max output tokens per response
+temperature = 0.3                    # Creativity (0.0 = deterministic, 1.0 = creative)
+system_prompt = """Your agent's personality, capabilities, and instructions.
+Be specific about what the agent should and should not do."""
+
+# Optional fallback model
+[[fallback_models]]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+# Optional schedule (for autonomous agents)
+[schedule]
+periodic = { cron = "every 5m" }                                     # Periodic execution
+# continuous = { check_interval_secs = 120 }                         # Continuous loop
+# proactive = { conditions = ["event:agent_spawned"] }               # Event-triggered
+
+# Resource limits
+[resources]
+max_llm_tokens_per_hour = 150000    # Token budget per hour
+max_concurrent_tools = 5            # Max parallel tool executions
+
+# Capability grants (principle of least privilege)
+[capabilities]
+tools = ["file_read", "file_write", "file_list", "shell_exec",
+         "memory_store", "memory_recall", "web_fetch",
+         "agent_send", "agent_list", "agent_spawn", "agent_kill"]
+network = ["*"]                     # Network access patterns
+memory_read = ["*"]                 # Memory namespaces agent can read
+memory_write = ["self.*"]           # Memory namespaces agent can write
+agent_spawn = true                  # Can this agent spawn other agents?
+agent_message = ["*"]               # Which agents can it message?
+shell = ["python *", "cargo *"]     # Allowed shell command patterns (whitelist)
+```
+
+### Available Tools
+
+<Steps>
+  <Step title="File Operations">
+    - `file_read` - Read file contents
+    - `file_write` - Write/create files
+    - `file_list` - List directory contents
+  </Step>
+  
+  <Step title="System Access">
+    - `shell_exec` - Execute shell commands (restricted by whitelist)
+  </Step>
+  
+  <Step title="Memory & Knowledge">
+    - `memory_store` - Persist key-value data
+    - `memory_recall` - Retrieve data from memory
+  </Step>
+  
+  <Step title="Network">
+    - `web_fetch` - Fetch content from URLs (SSRF-protected)
+  </Step>
+  
+  <Step title="Multi-Agent">
+    - `agent_send` - Send a message to another agent
+    - `agent_list` - List all running agents
+    - `agent_spawn` - Spawn a new agent
+    - `agent_kill` - Terminate a running agent
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Warning>
+**Start Minimal**: Grant only the tools and capabilities the agent actually needs. You can always add more later.
+</Warning>
+
+### System Prompt
+
+The system prompt is the most important part of the template. Be specific about:
+- The agent's role and methodology
+- Output format expectations
+- What the agent should and should not do
+- Limitations and disclaimers
+
+### Temperature Settings
+
+- **0.2** - Precise/analytical tasks (security audits, debugging)
+- **0.5** - Balanced tasks (general assistant, planning)
+- **0.7+** - Creative tasks (writing, brainstorming)
+
+### Shell Security
+
+<Warning>
+Never grant `shell = ["*"]`. Always whitelist specific command patterns.
+</Warning>
+
+Good examples:
+```toml
+shell = ["python *", "cargo test *", "git status", "git log *"]
+```
+
+### Token Budgets
+
+Use `max_llm_tokens_per_hour` to prevent runaway costs:
+- Start with **100,000** for most agents
+- Use **200,000+** for intensive tasks (research, code generation)
+- Use **50,000** for lightweight monitoring agents
+
+### Fallback Models
+
+Add fallback models to handle rate limits and availability issues:
+
+```toml
+# Primary model
+[model]
+provider = "gemini"
+model = "gemini-2.5-flash"
+
+# Fallback if primary fails
+[[fallback_models]]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+```
+
+### Memory for Continuity
+
+Grant `memory_store` and `memory_recall` so agents can persist context across sessions:
+
+```toml
+[capabilities]
+tools = ["memory_store", "memory_recall"]
+memory_read = ["*"]
+memory_write = ["self.*", "shared.*"]
+```
+
+## Managing Agents
+
+### Spawning Agents
+
+```bash
+# Spawn by template name
+openfang spawn coder
+
+# Spawn with a custom name
+openfang spawn coder --name "backend-coder"
+
+# Spawn from a TOML file path
+openfang spawn --template agents/custom/my-agent.toml
+
+# List running agents
+openfang agents
+
+# Kill an agent
+openfang kill <agent-id>
+```
+
+### Sending Messages
+
+```bash
+# CLI
+openfang message <agent-id> "Write a function to parse TOML files"
+
+# REST API
+curl -X POST http://localhost:4200/api/agents/{id}/message \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Implement the auth module"}'
+
+# WebSocket (streaming)
+ws://localhost:4200/api/agents/{id}/ws
+```
+
+### OpenAI-Compatible API
+
+Use any agent through the OpenAI-compatible endpoint:
+
+```bash
+curl -X POST http://localhost:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openfang:coder",
+    "messages": [{"role": "user", "content": "Write a Rust HTTP server"}],
+    "stream": true
+  }'
+```
+
+## Environment Variables
+
+Set API keys to enable model providers:
+
+| Variable | Provider | Used By |
+|----------|----------|--------|
+| `DEEPSEEK_API_KEY` | DeepSeek | Tier 1 (orchestrator, architect, security-auditor) |
+| `GEMINI_API_KEY` | Google Gemini | Tier 2 primary, Tier 3 fallback |
+| `GROQ_API_KEY` | Groq | Tier 3 primary, Tier 1/2 fallback, Tier 4 |
+
+<Note>
+At minimum, set `GROQ_API_KEY` to enable all Tier 3 and Tier 4 agents. Add `GEMINI_API_KEY` for Tier 2. Add `DEEPSEEK_API_KEY` for Tier 1 frontier agents.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflows" icon="diagram-project" href="/guides/workflows">
+    Chain agents together in multi-step pipelines
+  </Card>
+  
+  <Card title="Skill Development" icon="wrench" href="/guides/skill-development">
+    Extend agent capabilities with custom tools
+  </Card>
+</CardGroup>

@@ -1,0 +1,525 @@
+---
+title: 'Researcher Hand'
+description: 'Autonomous deep researcher that conducts exhaustive investigations with cross-referencing and fact-checking'
+icon: 'flask'
+---
+
+## Overview
+
+Researcher Hand is an AI-powered deep research agent that conducts thorough investigations, cross-references sources, fact-checks claims, and produces comprehensive structured reports.
+
+**Category:** Productivity  
+**Icon:** 🧪
+
+## What It Does
+
+<Steps>
+  <Step title="Analyze Question">
+    Decompose complex questions into sub-questions and identify source types
+  </Step>
+  
+  <Step title="Multi-Source Research">
+    Execute searches across web, academic papers, news, and specialized databases
+  </Step>
+  
+  <Step title="Cross-Reference">
+    Verify claims across multiple independent sources
+  </Step>
+  
+  <Step title="Fact-Check">
+    Check primary sources, known debunkings, and authoritative databases
+  </Step>
+  
+  <Step title="Synthesize & Report">
+    Generate structured reports with citations and confidence levels
+  </Step>
+</Steps>
+
+## Configuration
+
+### Research Depth
+
+| Setting | Sources | Passes | Use Case |
+|---------|---------|--------|----------|
+| **Quick** | 5-10 | 1 pass | Fast answers, straightforward questions |
+| **Thorough** | 20-30 | Cross-referenced | Balanced depth (default) |
+| **Exhaustive** | 50+ | Multi-pass, fact-checked | Critical decisions, academic-level research |
+
+### Output Style
+
+| Style | Format | Length | Use Case |
+|-------|--------|--------|----------|
+| **Brief** | Executive summary | 1-2 pages | Quick answers, busy executives |
+| **Detailed** | Structured report | 5-10 pages | Standard research (default) |
+| **Academic** | Formal paper | Variable | Research papers, formal citations |
+| **Executive** | Key findings + recommendations | 2-3 pages | Decision-makers |
+
+### Quality Controls
+
+| Setting | Description |
+|---------|-------------|
+| **Source Verification** | Cross-check claims across multiple sources |
+| **Max Sources** | 10, 30, 50, unlimited |
+| **Auto Follow-Up** | Research tangential questions discovered during investigation |
+| **Save Research Log** | Detailed log of queries and source evaluations |
+| **Citation Style** | `inline_url`, `footnotes`, `academic_apa`, `numbered` |
+
+## Activation
+
+### Basic Setup
+
+```bash
+openfang hand activate researcher
+```
+
+Configure research settings:
+
+```bash
+openfang hand config researcher \
+  --set research_depth="thorough" \
+  --set output_style="detailed" \
+  --set source_verification="true" \
+  --set max_sources="30" \
+  --set citation_style="inline_url"
+```
+
+### Example Workflow
+
+```
+Depth: Thorough (20-30 sources, cross-referenced)
+Style: Detailed report
+Verification: Enabled
+
+> Research: What are the most effective AI agent architectures as of 2026?
+```
+
+Researcher Hand will:
+1. Decompose into sub-questions:
+   - What agent architectures exist?
+   - How are they evaluated?
+   - Which perform best on benchmarks?
+   - What are real-world use cases?
+2. Execute 15-20 targeted searches
+3. Fetch and evaluate 25-30 sources
+4. Cross-reference key claims
+5. Fact-check critical assertions
+6. Generate 8-page report with citations
+7. Save as `research_ai_agent_architectures_2026-03-06.md`
+
+## How It Works
+
+### 1. Question Analysis
+
+Identifies question type and decomposes:
+
+| Type | Strategy | Example |
+|------|----------|----------|
+| **Factual** | Authoritative sources | "What is the capital of France?" |
+| **Comparative** | Multi-perspective analysis | "React vs Vue in 2026?" |
+| **Causal** | Evidence chains | "Why did Silicon Valley Bank fail?" |
+| **Predictive** | Trend analysis | "Will AGI arrive by 2030?" |
+| **How-to** | Step-by-step with examples | "How to build an AI agent?" |
+| **Survey** | Comprehensive landscape | "What are all the LLM providers?" |
+
+**Example decomposition:**
+
+```
+Question: "What are the most effective AI agent architectures as of 2026?"
+
+Type: Survey + Comparative
+
+Sub-questions:
+1. What agent architectures currently exist?
+2. How is "effectiveness" measured in agent benchmarks?
+3. Which architectures perform best on standard benchmarks?
+4. What are the trade-offs (speed, cost, reliability)?
+5. What are real-world deployment examples?
+```
+
+### 2. Search Strategy Construction
+
+For each sub-question, build 3-5 queries:
+
+**Direct queries:**
+```
+"AI agent architectures"
+"LLM agent frameworks explained"
+"agent architecture guide"
+```
+
+**Expert queries:**
+```
+"AI agent architecture research paper"
+"site:arxiv.org agent architecture"
+"agent framework comparison analysis"
+```
+
+**Comparison queries:**
+```
+"ReAct vs Plan-and-Execute agents"
+"agent architecture pros cons"
+"best AI agent framework 2026"
+```
+
+**Temporal queries:**
+```
+"AI agent architecture 2026"
+"latest agent framework"
+"agent architecture update"
+```
+
+**Deep queries:**
+```
+"agent architecture case study"
+"agent benchmark data"
+"agent architecture statistics"
+```
+
+### 3. Information Gathering
+
+For each search query:
+
+<Steps>
+  <Step title="Search">
+    `web_search(query)` to find results
+  </Step>
+  
+  <Step title="Evaluate">
+    Check URL domain and snippet relevance before fetching
+  </Step>
+  
+  <Step title="Fetch">
+    `web_fetch(url)` for promising sources
+  </Step>
+  
+  <Step title="Extract">
+    Key claims, data points, expert quotes, methodology, publication date, author credentials
+  </Step>
+</Steps>
+
+**Source quality evaluation (CRAAP test):**
+
+| Criteria | Questions | Score |
+|----------|-----------|-------|
+| **Currency** | When published? Still relevant? | A-F |
+| **Relevance** | Directly addresses question? | A-F |
+| **Authority** | Who wrote it? What credentials? | A-F |
+| **Accuracy** | Claims verifiable? Sources cited? | A-F |
+| **Purpose** | Informational, persuasive, commercial? | A-F |
+
+**Example evaluation:**
+```
+Source: "Agent Architectures in 2026" - arxiv.org/abs/2601.12345
+Currency: A (published Jan 2026)
+Relevance: A (directly compares architectures)
+Authority: A (researchers from Stanford, cited 45 times)
+Accuracy: A (methodology described, datasets linked)
+Purpose: A (academic research, no commercial bias)
+Overall: A (authoritative source)
+```
+
+If `save_research_log = true`:
+```markdown
+# Research Log: AI Agent Architectures
+
+## Query 1: "AI agent architectures 2026"
+Results: 10
+Fetched: 3
+- arxiv.org/abs/2601.12345 (A) - Comprehensive comparison
+- medium.com/@author/agents (C) - Overview, lacks depth
+- vendor.com/agents (D) - Commercial content, biased
+```
+
+### 4. Cross-Reference & Synthesis
+
+If `source_verification = true`:
+
+**Verify key claims:**
+```
+Claim: "ReAct agents outperform Plan-and-Execute on HotPotQA by 15%"
+
+Sources:
+1. arxiv.org/abs/2601.12345 - "ReAct: 68.2%, Plan-and-Execute: 59.1%"
+2. paperswithcode.com/sota/hotpotqa - Confirms ReAct leads
+3. github.com/react-paper - Official benchmark code
+
+Verification: ✓ Verified (3 independent sources)
+Confidence: High
+```
+
+**Flag contradictions:**
+```
+Claim: "LangGraph is the most popular agent framework"
+
+Source A (blog): "LangGraph dominates with 50k+ GitHub stars"
+Source B (GitHub): LangGraph has 12k stars, AutoGPT has 160k
+
+Contradiction: ⚠️ Sources disagree
+Resolution: Check primary source (GitHub actual stats)
+Result: Source A is incorrect/outdated
+```
+
+**Synthesis:**
+```markdown
+## Finding 1: Agent Architecture Landscape
+
+Consensus view (5 sources agree):
+- ReAct: Reasoning + acting in interleaved steps
+- Plan-and-Execute: Separate planning and execution phases
+- Reflection: Iterative self-critique and improvement
+- LLM Compiler: Parallel tool execution with DAG planning
+
+Minority view (1 source):
+- "Hybrid architectures outperform pure approaches" (needs more evidence)
+
+Gaps in knowledge:
+- Limited data on production deployment costs
+- No standardized benchmark for long-running agents
+```
+
+### 5. Fact-Check Pass
+
+For critical claims:
+
+1. **Find primary source** — Original research, official data, not secondary reporting
+2. **Check for debunkings** — Search "[claim] debunked" or "[claim] false"
+3. **Verify statistics** — Cross-check against authoritative databases
+4. **Flag weak evidence** — Single-source claims, contested assertions
+
+**Confidence levels:**
+
+| Level | Criteria |
+|-------|----------|
+| **Verified** | 3+ authoritative sources confirm |
+| **Likely** | 2 sources or 1 authoritative source |
+| **Unverified** | Single source, plausible but unconfirmed |
+| **Disputed** | Sources disagree |
+
+### 6. Report Generation
+
+#### Detailed Report (Default)
+
+```markdown
+# Research Report: AI Agent Architectures in 2026
+**Date**: 2026-03-06 | **Sources Consulted**: 28 | **Confidence**: High
+
+## Executive Summary
+
+As of March 2026, the AI agent architecture landscape has consolidated around
+four primary approaches: ReAct (reasoning-acting), Plan-and-Execute (decomposition),
+Reflection (self-critique), and LLM Compiler (parallelization). Empirical benchmarks
+show ReAct leading on question-answering tasks (HotPotQA: 68%), while Plan-and-Execute
+excels on multi-step workflows (WebShop: 71%). Production deployments favor hybrid
+approaches combining strengths of multiple architectures.
+
+## Detailed Findings
+
+### 1. Agent Architecture Taxonomy
+
+**ReAct (Reasoning + Acting)**  
+Source: [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629)  
+Confidence: Verified
+
+ReAct interleaves reasoning steps ("Thought:") with actions ("Action:") in a loop.
+Each cycle produces an observation that feeds the next reasoning step.
+
+**Performance:**
+- HotPotQA: 68.2% (verified, 3 sources)
+- FEVER: 71.4% (verified, 2 sources)
+
+**Strengths:** Interpretable, handles dynamic tasks  
+**Weaknesses:** Sequential bottleneck, token-inefficient
+
+---
+
+### 2. Comparative Performance
+
+| Architecture | HotPotQA | WebShop | GAIA | Avg |
+|--------------|----------|---------|------|-----|
+| ReAct | 68.2% | 59.1% | 34.2% | 53.8% |
+| Plan-and-Execute | 59.1% | 71.3% | 41.0% | 57.1% |
+| Reflection | 64.7% | 65.2% | 38.9% | 56.3% |
+| LLM Compiler | 66.1% | 68.4% | 43.7% | 59.4% |
+
+Source: [Agent Architecture Benchmark 2026](https://arxiv.org/abs/2601.12345)  
+Confidence: High (primary research, peer-reviewed)
+
+---
+
+## Key Data Points
+
+| Metric | Value | Source | Confidence |
+|--------|-------|--------|------------|
+| GitHub stars (LangGraph) | 12,034 | GitHub API | Verified |
+| Median agent latency | 3.2s | Anthropic blog | Likely |
+| Production cost (1M runs) | $850 | Estimate from sources | Unverified |
+
+## Contradictions & Open Questions
+
+**Contradiction:** Cost estimates vary widely  
+Source A claims $500/1M runs, Source B claims $1200/1M.  
+Likely explanation: Depends heavily on model choice and caching.
+
+**Open question:** Long-running agent stability  
+No standardized benchmark exists for agents running 100+ steps.  
+Gap in research literature.
+
+## Sources
+
+### Primary Sources (A-tier)
+1. [ReAct: Synergizing Reasoning and Acting](https://arxiv.org/abs/2210.03629) - Original ReAct paper, 1200+ citations
+2. [Agent Architecture Benchmark 2026](https://arxiv.org/abs/2601.12345) - Comprehensive comparison, Stanford
+3. [LLM Compiler: Parallel Function Calling](https://arxiv.org/abs/2312.04511) - UC Berkeley research
+
+### Secondary Sources (B-tier)
+4. [LangGraph Documentation](https://langchain.com/langgraph) - Official framework docs
+5. [Anthropic: Building Reliable Agents](https://anthropic.com/blog/agents) - Engineering best practices
+
+### Supporting Sources (C-tier)
+6. [Medium: Agent Architectures Overview](https://medium.com/@author/agents) - Good overview, lacks rigor
+
+[... 22 more sources listed with ratings ...]
+```
+
+#### Brief Report
+
+```markdown
+# Research: AI Agent Architectures (2026)
+
+## Key Findings
+
+- **Four main architectures**: ReAct, Plan-and-Execute, Reflection, LLM Compiler
+- **Best for QA**: ReAct (68% on HotPotQA)
+- **Best for workflows**: Plan-and-Execute (71% on WebShop)
+- **Best overall**: LLM Compiler (59% average across benchmarks)
+- **Production trend**: Hybrid approaches combining multiple strategies
+
+## Sources
+1. [Agent Benchmark 2026](https://arxiv.org/abs/2601.12345) - Stanford research
+2. [ReAct Paper](https://arxiv.org/abs/2210.03629) - Original framework
+3. [Anthropic Agents Guide](https://anthropic.com/blog/agents) - Best practices
+4. [LangGraph Docs](https://langchain.com/langgraph) - Implementation
+5. [LLM Compiler](https://arxiv.org/abs/2312.04511) - Parallel execution
+```
+
+#### Academic Report
+
+```markdown
+# A Survey of AI Agent Architectures in 2026
+
+## Abstract
+
+This survey examines the current landscape of AI agent architectures...
+
+## Introduction
+
+Autonomous AI agents have emerged as a critical application of large language
+models (LLMs). This paper surveys the architectural approaches...
+
+## Methodology
+
+We conducted a systematic review of 28 sources including peer-reviewed papers,
+official documentation, and benchmark repositories...
+
+## Findings
+
+### 3.1 ReAct Architecture
+
+Yao et al. (2022) introduced ReAct, which synergizes reasoning and acting...
+
+## Discussion
+
+## Conclusion
+
+## References
+
+Anthropic. (2026). Building Reliable Agents. Retrieved from https://anthropic.com/blog/agents
+
+Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., & Cao, Y. (2022).
+ReAct: Synergizing Reasoning and Acting in Language Models. arXiv:2210.03629.
+
+[... APA-formatted references ...]
+```
+
+## Output
+
+| File | Description |
+|------|-------------|
+| `research_[topic]_YYYY-MM-DD.md` | Main research report |
+| `research_log_YYYY-MM-DD.md` | Detailed query and source log (if enabled) |
+
+## Dashboard Metrics
+
+- **Queries Solved** — Research questions answered
+- **Sources Cited** — Total unique sources used
+- **Reports Generated** — Number of reports delivered
+- **Active Investigations** — In-progress research
+
+## Tips & Best Practices
+
+<Note>
+**For best results:**
+
+- Use Thorough depth for most questions (Quick often misses nuances)
+- Enable source verification for important decisions
+- Review sources section — check if Hand found authoritative sources
+- Ask follow-up questions if findings are unclear
+- Export to PDF for sharing with stakeholders
+</Note>
+
+<Warning>
+**Researcher Hand never fabricates sources or data.** Every claim is traceable to an actual source. If you see "No reliable sources found," that's accurate — not a failure.
+</Warning>
+
+### Common Issues
+
+**"No reliable sources found"**  
+Question may be too niche, recent, or speculative. Try broadening the question.
+
+**"Sources disagree"**  
+This is valuable information! The Hand will report both perspectives.
+
+**"Report is too long"**  
+Switch to `output_style="brief"` for executive summaries.
+
+**"Missing key source"**  
+If you know of a critical source, mention it: "Research X, and be sure to check Y source."
+
+## Advanced Usage
+
+### Multi-Language Research
+
+```bash
+openfang hand config researcher --set language="spanish"
+```
+
+```
+Investigar: ¿Cuáles son las mejores arquitecturas de agentes IA en 2026?
+```
+
+### Follow-Up Research
+
+```
+Based on your previous research on agent architectures, now research:
+Which architecture is best for production chatbots?
+```
+
+### Comparative Deep-Dive
+
+```
+Research: Compare ReAct vs Plan-and-Execute agent architectures.
+Depth: Exhaustive
+Style: Academic
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Collector Hand" icon="magnifying-glass" href="/hands/collector">
+    Monitor research topics continuously
+  </Card>
+  
+  <Card title="Predictor Hand" icon="crystal-ball" href="/hands/predictor">
+    Make predictions based on research findings
+  </Card>
+</CardGroup>

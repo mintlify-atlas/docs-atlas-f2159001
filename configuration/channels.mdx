@@ -1,0 +1,471 @@
+---
+title: Channel Adapters
+description: Configure 40+ messaging platforms to connect your agents with users
+---
+
+OpenFang supports 40+ messaging platforms through channel adapters. Each channel can have custom behavior policies, rate limits, and per-channel model overrides.
+
+## Supported Channels
+
+OpenFang supports these messaging platforms:
+
+### Core Platforms
+
+<CardGroup cols={3}>
+  <Card title="Telegram" icon="telegram">Popular messaging with bot API</Card>
+  <Card title="Discord" icon="discord">Gaming and community platform</Card>
+  <Card title="Slack" icon="slack">Enterprise team communication</Card>
+  <Card title="WhatsApp" icon="whatsapp">Global messaging leader</Card>
+  <Card title="Signal" icon="shield">Privacy-focused messaging</Card>
+  <Card title="Matrix" icon="matrix">Decentralized protocol</Card>
+  <Card title="Email" icon="envelope">IMAP/SMTP support</Card>
+</CardGroup>
+
+### Enterprise
+
+<CardGroup cols={3}>
+  <Card title="Microsoft Teams" icon="microsoft">Office 365 integration</Card>
+  <Card title="Mattermost" icon="message">Self-hosted Slack alternative</Card>
+  <Card title="Google Chat" icon="google">Workspace messaging</Card>
+  <Card title="Webex" icon="cisco">Cisco collaboration</Card>
+  <Card title="Feishu/Lark" icon="feather">ByteDance workplace</Card>
+  <Card title="Zulip" icon="stream">Threaded conversations</Card>
+</CardGroup>
+
+### Social & Community
+
+<CardGroup cols={3}>
+  <Card title="LINE" icon="line">Popular in Asia</Card>
+  <Card title="Viber" icon="viber">Global messaging</Card>
+  <Card title="Facebook Messenger" icon="facebook">Meta platform</Card>
+  <Card title="Mastodon" icon="mastodon">Federated social</Card>
+  <Card title="Bluesky" icon="cloud">AT Protocol</Card>
+  <Card title="Reddit" icon="reddit">Community discussions</Card>
+  <Card title="LinkedIn" icon="linkedin">Professional network</Card>
+  <Card title="Twitch" icon="twitch">Live streaming chat</Card>
+</CardGroup>
+
+### Privacy & Open Source
+
+<CardGroup cols={3}>
+  <Card title="Threema" icon="lock">Swiss privacy messaging</Card>
+  <Card title="Nostr" icon="nostr">Decentralized protocol</Card>
+  <Card title="Mumble" icon="microphone">Low-latency voice</Card>
+  <Card title="Nextcloud Talk" icon="nextcloud">Self-hosted chat</Card>
+  <Card title="Rocket.Chat" icon="rocket">Open source platform</Card>
+  <Card title="Ntfy" icon="bell">Push notifications</Card>
+  <Card title="Gotify" icon="notification">Self-hosted notifications</Card>
+</CardGroup>
+
+### Legacy & Niche
+
+<CardGroup cols={3}>
+  <Card title="IRC" icon="hashtag">Classic protocol</Card>
+  <Card title="XMPP" icon="jabber">Extensible messaging</Card>
+  <Card title="Guilded" icon="guilded">Gaming communities</Card>
+  <Card title="Revolt" icon="revolt">Discord alternative</Card>
+  <Card title="Keybase" icon="key">Crypto messaging</Card>
+  <Card title="Discourse" icon="discourse">Forum platform</Card>
+  <Card title="Gitter" icon="gitter">Developer chat</Card>
+  <Card title="Pumble" icon="pumble">Team messaging</Card>
+  <Card title="Flock" icon="flock">Business messaging</Card>
+  <Card title="Twist" icon="twist">Async communication</Card>
+  <Card title="DingTalk" icon="dingtalk">Alibaba workplace</Card>
+  <Card title="Zalo" icon="zalo">Vietnamese messaging</Card>
+  <Card title="Webhooks" icon="webhook">Custom integrations</Card>
+</CardGroup>
+
+## Quick Setup Examples
+
+### Telegram
+
+<CodeGroup>
+```toml config.toml
+[telegram]
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+allowed_users = []  # Empty = allow all users
+```
+
+```bash Environment
+export TELEGRAM_BOT_TOKEN="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+```
+</CodeGroup>
+
+**Setup Steps**:
+
+1. Message [@BotFather](https://t.me/botfather) on Telegram
+2. Send `/newbot` and follow the prompts
+3. Copy the bot token
+4. Add token to environment variable
+5. Start OpenFang
+
+<ParamField path="bot_token_env" type="string" required>
+  Environment variable containing the Telegram bot token
+</ParamField>
+
+<ParamField path="allowed_users" type="array">
+  List of Telegram user IDs allowed to interact. Empty array = allow all.
+</ParamField>
+
+---
+
+### Discord
+
+<CodeGroup>
+```toml config.toml
+[discord]
+bot_token_env = "DISCORD_BOT_TOKEN"
+guild_ids = []  # Empty = all guilds
+```
+
+```bash Environment
+export DISCORD_BOT_TOKEN="MTIzNDU2Nzg5MDEyMzQ1Njc4OQ.GaBcDe.FgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmNo"
+```
+</CodeGroup>
+
+**Setup Steps**:
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application
+3. Go to "Bot" section and create a bot
+4. Copy the bot token
+5. Enable "Message Content Intent" in bot settings
+6. Invite bot to your server using OAuth2 URL
+
+<ParamField path="bot_token_env" type="string" required>
+  Environment variable containing the Discord bot token
+</ParamField>
+
+<ParamField path="guild_ids" type="array">
+  List of Discord guild (server) IDs. Empty = respond in all guilds.
+</ParamField>
+
+---
+
+### Slack
+
+<CodeGroup>
+```toml config.toml
+[slack]
+bot_token_env = "SLACK_BOT_TOKEN"
+app_token_env = "SLACK_APP_TOKEN"
+```
+
+```bash Environment
+export SLACK_BOT_TOKEN="xoxb-1234567890-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx"
+export SLACK_APP_TOKEN="xapp-1-A01234567-1234567890-abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+```
+</CodeGroup>
+
+**Setup Steps**:
+
+1. Go to [Slack API](https://api.slack.com/apps)
+2. Create a new app ("From scratch")
+3. Enable Socket Mode
+4. Add bot token scopes: `chat:write`, `app_mentions:read`, `channels:history`
+5. Install app to workspace
+6. Copy both Bot Token and App Token
+
+<ParamField path="bot_token_env" type="string" required>
+  Environment variable containing the Slack bot token (starts with `xoxb-`)
+</ParamField>
+
+<ParamField path="app_token_env" type="string" required>
+  Environment variable containing the Slack app token (starts with `xapp-`)
+</ParamField>
+
+---
+
+### WhatsApp
+
+<CodeGroup>
+```toml config.toml
+[whatsapp]
+phone_number_id_env = "WHATSAPP_PHONE_NUMBER_ID"
+access_token_env = "WHATSAPP_ACCESS_TOKEN"
+verify_token_env = "WHATSAPP_VERIFY_TOKEN"
+```
+
+```bash Environment
+export WHATSAPP_PHONE_NUMBER_ID="123456789012345"
+export WHATSAPP_ACCESS_TOKEN="EAABsbCS1iHg..."
+export WHATSAPP_VERIFY_TOKEN="my_verify_token_12345"
+```
+</CodeGroup>
+
+**Setup Steps**:
+
+1. Go to [Meta for Developers](https://developers.facebook.com)
+2. Create a new app with WhatsApp product
+3. Get phone number ID from WhatsApp API settings
+4. Generate a permanent access token
+5. Configure webhook with your verify token
+
+---
+
+## Channel Behavior Policies
+
+Each channel can have custom behavior policies:
+
+```toml
+[telegram.overrides]
+dm_policy = "respond"            # "respond", "allowed_only", "ignore"
+group_policy = "mention_only"    # "all", "mention_only", "commands_only", "ignore"
+rate_limit_per_user = 10         # Messages per minute (0 = unlimited)
+threading = true                 # Enable thread replies
+output_format = "markdown"       # "markdown", "telegram_html", "slack_mrkdwn", "plain_text"
+usage_footer = "off"             # "off", "tokens", "cost", "full"
+```
+
+### DM Policy
+
+<ParamField path="dm_policy" type="enum" default="respond">
+  How to handle direct messages:
+  - `respond`: Reply to all DMs
+  - `allowed_only`: Only reply to users in allowed list
+  - `ignore`: Ignore all DMs
+</ParamField>
+
+### Group Policy
+
+<ParamField path="group_policy" type="enum" default="mention_only">
+  How to handle group messages:
+  - `all`: Respond to all messages in group
+  - `mention_only`: Only respond when @mentioned
+  - `commands_only`: Only respond to slash commands
+  - `ignore`: Ignore all group messages
+</ParamField>
+
+### Rate Limiting
+
+<ParamField path="rate_limit_per_user" type="integer" default="10">
+  Maximum messages per user per minute. Set to 0 for unlimited.
+</ParamField>
+
+### Output Formatting
+
+<ParamField path="output_format" type="enum">
+  Format of agent responses:
+  - `markdown`: Standard Markdown (default)
+  - `telegram_html`: Telegram HTML subset
+  - `slack_mrkdwn`: Slack's mrkdwn format
+  - `plain_text`: No formatting
+</ParamField>
+
+## Per-Channel Model Override
+
+Use different models for different channels:
+
+```toml
+# Use fast, cheap model for Telegram
+[telegram.overrides]
+model = "claude-haiku-4.5-20251001"
+
+# Use premium model for enterprise Slack
+[slack.overrides]
+model = "claude-opus-4-20250514"
+
+# Use local model for privacy-focused Signal
+[signal.overrides]
+model = "llama3.2:latest"
+provider = "ollama"
+```
+
+## Advanced Channel Configuration
+
+### Discord with Custom Intents
+
+```toml
+[discord]
+bot_token_env = "DISCORD_BOT_TOKEN"
+guild_ids = ["123456789012345678", "987654321098765432"]
+
+[discord.overrides]
+group_policy = "all"              # Respond to all messages
+threading = true                  # Use Discord threads
+output_format = "markdown"
+```
+
+### Slack with Socket Mode
+
+```toml
+[slack]
+bot_token_env = "SLACK_BOT_TOKEN"
+app_token_env = "SLACK_APP_TOKEN"
+
+[slack.overrides]
+dm_policy = "respond"
+group_policy = "mention_only"
+rate_limit_per_user = 20
+output_format = "slack_mrkdwn"
+```
+
+### Telegram with Allowed Users
+
+```toml
+[telegram]
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+allowed_users = [123456789, 987654321]  # Telegram user IDs
+
+[telegram.overrides]
+dm_policy = "allowed_only"
+group_policy = "mention_only"
+rate_limit_per_user = 30
+```
+
+### Matrix with Encryption
+
+```toml
+[matrix]
+homeserver_url = "https://matrix.org"
+username_env = "MATRIX_USERNAME"
+password_env = "MATRIX_PASSWORD"
+encryption = true
+```
+
+## Email Channel (IMAP/SMTP)
+
+```toml
+[email]
+imap_host = "imap.gmail.com"
+imap_port = 993
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+username_env = "EMAIL_USERNAME"
+password_env = "EMAIL_PASSWORD"  # Use app password for Gmail
+
+[email.overrides]
+rate_limit_per_user = 5  # Prevent email spam
+output_format = "plain_text"
+```
+
+## Webhook Channel
+
+```toml
+[webhook_trigger]
+enabled = true
+token_env = "OPENFANG_WEBHOOK_TOKEN"  # Must be 32+ chars
+max_payload_bytes = 65536
+rate_limit_per_minute = 30
+```
+
+**Trigger agents via HTTP**:
+
+```bash
+curl -X POST http://localhost:4200/hooks/agent \
+  -H "Authorization: Bearer $OPENFANG_WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "researcher",
+    "message": "Research quantum computing trends"
+  }'
+```
+
+## Typing Indicators
+
+Show "typing..." indicators while agent is thinking:
+
+```toml
+[telegram.overrides]
+typing_mode = "on"  # "on", "off", or "long_only"
+
+[discord.overrides]
+typing_mode = "long_only"  # Only for responses >10 seconds
+```
+
+## Multi-Channel Agent
+
+Configure an agent to work across multiple channels:
+
+```toml
+# Telegram for personal use
+[telegram]
+bot_token_env = "TELEGRAM_BOT_TOKEN"
+allowed_users = [123456789]
+
+[telegram.overrides]
+model = "claude-sonnet-4-20250514"
+usage_footer = "full"
+
+# Discord for community support
+[discord]
+bot_token_env = "DISCORD_BOT_TOKEN"
+guild_ids = []
+
+[discord.overrides]
+model = "claude-haiku-4.5-20251001"  # Cheaper for public
+group_policy = "mention_only"
+rate_limit_per_user = 5
+usage_footer = "off"
+
+# Slack for enterprise
+[slack]
+bot_token_env = "SLACK_BOT_TOKEN"
+app_token_env = "SLACK_APP_TOKEN"
+
+[slack.overrides]
+model = "claude-opus-4-20250514"  # Premium for work
+dm_policy = "respond"
+group_policy = "all"
+rate_limit_per_user = 30
+usage_footer = "cost"
+```
+
+## Channel Health Check
+
+Verify channel connectivity:
+
+```bash
+# List all configured channels
+openfang channels list
+
+# Test a specific channel
+openfang channels test telegram
+
+# Check channel status
+openfang channels status
+```
+
+## Troubleshooting
+
+### Bot Not Responding
+
+1. **Check token**: `echo $TELEGRAM_BOT_TOKEN`
+2. **Verify permissions**: Ensure bot has required scopes
+3. **Check logs**: `openfang logs --follow`
+4. **Test connection**: `openfang channels test telegram`
+
+### Rate Limit Errors
+
+Adjust per-user rate limits:
+
+```toml
+[telegram.overrides]
+rate_limit_per_user = 20  # Increase from default 10
+```
+
+### Group Messages Ignored
+
+Ensure group policy allows responses:
+
+```toml
+[discord.overrides]
+group_policy = "mention_only"  # or "all"
+```
+
+### Permission Errors (Discord)
+
+Enable required intents in Discord Developer Portal:
+- Message Content Intent
+- Guild Members Intent (for user info)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Settings" icon="shield" href="/configuration/security">
+    Configure authentication and rate limiting
+  </Card>
+  <Card title="Model Configuration" icon="brain" href="/configuration/models">
+    Setup LLM providers and routing
+  </Card>
+</CardGroup>
