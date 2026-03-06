@@ -1,0 +1,164 @@
+{
+  "projectType": "framework",
+  "projectName": "OpenFang",
+  "projectDescription": "Open-source Agent Operating System built in Rust for autonomous AI agents",
+  "theme": "aspen",
+  "primaryColor": "#fcf4f4",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/agents",
+              "concepts/hands",
+              "concepts/memory",
+              "concepts/security"
+            ]
+          },
+          {
+            "group": "Autonomous Hands",
+            "pages": [
+              "hands/overview",
+              "hands/clip",
+              "hands/lead",
+              "hands/collector",
+              "hands/predictor",
+              "hands/researcher",
+              "hands/twitter",
+              "hands/browser",
+              "hands/custom"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/models",
+              "configuration/providers",
+              "configuration/channels",
+              "configuration/security"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/channels",
+              "integrations/mcp",
+              "integrations/a2a",
+              "integrations/skills"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-agents",
+              "guides/workflows",
+              "guides/skill-development",
+              "guides/migration",
+              "guides/desktop-app",
+              "guides/production"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "REST API",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/agents",
+              "api/memory",
+              "api/workflows",
+              "api/channels",
+              "api/models"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/daemon",
+              "cli/agent-commands",
+              "cli/workflow-commands",
+              "cli/skill-commands",
+              "cli/channel-commands"
+            ]
+          },
+          {
+            "group": "OpenAI Compatibility",
+            "pages": [
+              "api/openai-compat"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Additional Resources",
+            "pages": [
+              "resources/benchmarks",
+              "resources/troubleshooting",
+              "resources/changelog",
+              "resources/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Autonomous Hands - 7 pre-built capability packages that run independently on schedules",
+    "16-layer security system with WASM sandbox, Merkle audit trail, and SSRF protection",
+    "40 channel adapters for connecting agents to messaging platforms",
+    "27 LLM providers with 123+ models and intelligent routing",
+    "Model Context Protocol (MCP) client and server support",
+    "Agent-to-Agent (A2A) protocol for inter-system communication",
+    "OpenFang Protocol (OFP) for P2P agent networking with HMAC-SHA256 auth",
+    "Capability-based security with inheritance validation",
+    "60 bundled skills with FangHub/ClawHub marketplace integration",
+    "SQLite memory substrate with vector embeddings and knowledge graphs",
+    "Desktop app with Tauri 2.0 and system tray integration",
+    "Single ~32MB binary with zero dependencies"
+  ],
+  "publicApiSurface": [
+    "openfang init - Initialize configuration",
+    "openfang start - Start the daemon",
+    "openfang agent spawn <template> - Spawn a new agent",
+    "openfang agent chat <name> - Chat with an agent",
+    "openfang hand activate <name> - Activate autonomous Hand",
+    "openfang workflow create/run - Manage workflows",
+    "openfang skill install/list - Manage skills",
+    "openfang channel setup/enable - Configure channels",
+    "openfang migrate --from openclaw - Migration from OpenClaw",
+    "REST API: POST /api/agents/{id}/message - Send message to agent",
+    "REST API: GET /api/agents - List all agents",
+    "REST API: POST /v1/chat/completions - OpenAI-compatible endpoint",
+    "REST API: GET /api/models - List available models",
+    "REST API: POST /api/workflows/{id}/run - Execute workflow",
+    "WebSocket: /ws - Real-time agent chat streaming",
+    "Rust crate: openfang-kernel - Core orchestration kernel",
+    "Rust crate: openfang-runtime - Agent execution engine",
+    "Rust crate: openfang-api - HTTP API server",
+    "Rust crate: openfang-channels - 40 channel adapters",
+    "Rust crate: openfang-memory - SQLite memory substrate"
+  ]
+}
